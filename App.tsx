@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
@@ -6,6 +7,8 @@ import StatsView from './views/StatsView';
 import SettingsView from './views/SettingsView';
 import FocusSessionView from './views/FocusSessionView';
 import { Task, Settings, Priority, FocusRecord, TimerMode, User } from './types';
+import { NativeService } from './services/native'; // Import the new bridge
+import { Zap } from 'lucide-react';
 
 // STORAGE KEYS
 const STORAGE_KEYS = {
@@ -18,75 +21,103 @@ const STORAGE_KEYS = {
 function App() {
   const [activeTab, setActiveTab] = useState('timer');
   const [isFocusSessionActive, setIsFocusSessionActive] = useState(false);
+  
+  // App Loading State (Crucial for Async Native Storage)
+  const [isAppReady, setIsAppReady] = useState(false);
+
   const [currentSessionParams, setCurrentSessionParams] = useState<{
       mode: TimerMode;
       durationMinutes: number;
       taskId?: string;
   } | null>(null);
   
-  // --- 1. Load Initial State from LocalStorage (Serverless Approach) ---
-  
-  const [user, setUser] = useState<User | null>(() => {
-      const saved = localStorage.getItem(STORAGE_KEYS.USER);
-      return saved ? JSON.parse(saved) : null;
+  // --- 1. State Definitions (Initially Empty) ---
+  const [user, setUser] = useState<User | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [focusHistory, setFocusHistory] = useState<FocusRecord[]>([]);
+  const [settings, setSettings] = useState<Settings>({
+      workTime: 25, 
+      shortBreakTime: 5, 
+      longBreakTime: 15, 
+      pomodorosPerRound: 4 
   });
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-      const saved = localStorage.getItem(STORAGE_KEYS.TASKS);
-      if (saved) return JSON.parse(saved);
+  // --- 2. Async Initialization (The Circuit Init) ---
+  useEffect(() => {
+    const initApp = async () => {
+        try {
+            // Load User
+            const savedUser = await NativeService.Storage.get<User>(STORAGE_KEYS.USER);
+            if (savedUser) setUser(savedUser);
 
-      // Default Initial Data if empty
-      const today = new Date().toISOString().split('T')[0];
-      return [
-        { id: '1', title: 'Welcome to FocusFlow', date: today, time: '09:00', durationMinutes: 25, priority: Priority.HIGH, completed: false, pomodoroCount: 1, note: 'This is a local-first app.' },
-        { id: '2', title: 'Try the Timer', date: today, time: '10:00', durationMinutes: 45, priority: Priority.MEDIUM, completed: false, pomodoroCount: 2, note: '' },
-      ];
-  });
-  
-  const [focusHistory, setFocusHistory] = useState<FocusRecord[]>(() => {
-      const saved = localStorage.getItem(STORAGE_KEYS.HISTORY);
-      return saved ? JSON.parse(saved) : [
-          { id: 'mock-1', date: new Date(Date.now() - 86400000 * 1).toISOString().split('T')[0], durationMinutes: 45, mode: TimerMode.POMODORO }
-      ];
-  });
+            // Load Settings
+            const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
+            if (savedSettings) setSettings(savedSettings);
 
-  const [settings, setSettings] = useState<Settings>(() => {
-      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return saved ? JSON.parse(saved) : {
-        workTime: 25,
-        shortBreakTime: 5,
-        longBreakTime: 15,
-        pomodorosPerRound: 4
-      };
-  });
+            // Load Tasks
+            const savedTasks = await NativeService.Storage.get<Task[]>(STORAGE_KEYS.TASKS);
+            if (savedTasks) {
+                setTasks(savedTasks);
+            } else {
+                 // First Time Launch Data
+                 const today = new Date().toISOString().split('T')[0];
+                 const initialTasks = [
+                    { id: '1', title: 'Welcome to FocusFlow', date: today, time: '09:00', durationMinutes: 25, priority: Priority.HIGH, completed: false, pomodoroCount: 1, note: 'This is a local-first app.' },
+                 ];
+                 setTasks(initialTasks);
+                 await NativeService.Storage.set(STORAGE_KEYS.TASKS, initialTasks);
+            }
 
-  // --- 2. Persist Changes to LocalStorage Automatically ---
+            // Load History
+            const savedHistory = await NativeService.Storage.get<FocusRecord[]>(STORAGE_KEYS.HISTORY);
+            if (savedHistory) setFocusHistory(savedHistory);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks)); }, [tasks]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(focusHistory)); }, [focusHistory]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings)); }, [settings]);
+        } catch (e) {
+            console.error("Failed to initialize app data", e);
+        } finally {
+            // Artificial delay to prevent flash (and simulate native splash screen fade out)
+            setTimeout(() => setIsAppReady(true), 500);
+        }
+    };
+
+    initApp();
+  }, []);
+
+  // --- 3. Persistence Observers (Auto-Save) ---
+  // We use references or specific logic to avoid saving empty states during init
+  // But since we have isAppReady, we can guard against overwriting data with empty arrays during boot.
+
+  useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.TASKS, tasks); }, [tasks, isAppReady]);
+  useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.HISTORY, focusHistory); }, [focusHistory, isAppReady]);
+  useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
   useEffect(() => { 
-      if (user) localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      else localStorage.removeItem(STORAGE_KEYS.USER);
-  }, [user]);
+      if(isAppReady) {
+        if (user) NativeService.Storage.set(STORAGE_KEYS.USER, user);
+        else NativeService.Storage.remove(STORAGE_KEYS.USER);
+      }
+  }, [user, isAppReady]);
 
 
   // --- Actions ---
 
   const addTask = (task: Task) => {
     setTasks([...tasks, task]);
+    NativeService.Haptics.impactLight();
   };
 
   const updateTask = (updatedTask: Task) => {
     setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+    NativeService.Haptics.impactLight();
   };
 
   const deleteTask = (id: string) => {
     setTasks(tasks.filter(t => t.id !== id));
+    NativeService.Haptics.impactMedium();
   };
 
   const toggleTask = (id: string) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+    NativeService.Haptics.impactLight();
   };
 
   const addFocusRecord = (minutes: number, mode: TimerMode) => {
@@ -100,9 +131,8 @@ function App() {
       setFocusHistory(prev => [...prev, newRecord]);
   };
 
-  // --- Simulated "Serverless" Auth Logic ---
-  
   const handleLogin = (provider: 'apple' | 'google') => {
+      NativeService.Haptics.impactMedium();
       setTimeout(() => {
         setUser({
             id: 'u_12345',
@@ -110,23 +140,26 @@ function App() {
             email: provider === 'apple' ? 'user@icloud.com' : 'user@gmail.com',
             isPremium: false,
         });
+        NativeService.Haptics.notificationSuccess();
       }, 800);
   };
 
   const handleLogout = () => {
+      NativeService.Haptics.impactMedium();
       setUser(null);
   };
 
   const handleUpgrade = () => {
+      NativeService.Haptics.impactMedium();
       if (user) {
           const updatedUser = { ...user, isPremium: true, planExpiry: 'Lifetime' };
           setUser(updatedUser);
+          NativeService.Haptics.notificationSuccess();
       }
   };
 
-  // --- Session Handlers ---
-  
   const handleStartSession = (duration: number, mode: TimerMode, taskId?: string) => {
+      NativeService.Haptics.impactMedium();
       setCurrentSessionParams({ durationMinutes: duration, mode, taskId });
       setIsFocusSessionActive(true);
   };
@@ -134,24 +167,36 @@ function App() {
   const handleSessionComplete = (minutes: number) => {
       if (currentSessionParams) {
           addFocusRecord(minutes, currentSessionParams.mode);
-          // If it was a specific task, we could increment its counter here if needed
-          if (currentSessionParams.taskId) {
-             // Logic to update task stats specifically could go here
-          }
       }
       setIsFocusSessionActive(false);
       setCurrentSessionParams(null);
+      NativeService.Haptics.notificationSuccess();
   };
 
   const handleSessionCancel = () => {
       setIsFocusSessionActive(false);
       setCurrentSessionParams(null);
+      NativeService.Haptics.impactLight();
   };
 
 
   // --- Render ---
 
-  // 1. High Priority: Focus Session (Camera View)
+  // Splash Screen State
+  if (!isAppReady) {
+      return (
+          <div className="h-screen w-full bg-[#f2f2f7] flex items-center justify-center">
+              <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 bg-blue-500 rounded-2xl shadow-xl shadow-blue-200 flex items-center justify-center mb-4 animate-bounce">
+                      <Zap size={32} className="text-white" fill="currentColor"/>
+                  </div>
+                  <h1 className="text-xl font-bold text-gray-900 tracking-tight">FocusFlow</h1>
+              </div>
+          </div>
+      );
+  }
+
+  // Focus Session (Full Screen Modal)
   if (isFocusSessionActive && currentSessionParams) {
       const task = currentSessionParams.taskId ? tasks.find(t => t.id === currentSessionParams.taskId) : undefined;
       return (
@@ -172,8 +217,8 @@ function App() {
             tasks={tasks.filter(t => !t.completed)} 
             settings={settings} 
             setSettings={setSettings} 
-            onRecordTime={addFocusRecord} // Fallback
-            onStartSession={handleStartSession} // New: Handover to Camera View
+            onRecordTime={addFocusRecord} 
+            onStartSession={handleStartSession} 
         />;
       case 'tasks':
         return <TasksView 
@@ -204,7 +249,10 @@ function App() {
       <main className="h-full w-full">
         {renderContent()}
       </main>
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav activeTab={activeTab} setActiveTab={(tab) => {
+          setActiveTab(tab);
+          NativeService.Haptics.impactLight();
+      }} />
     </div>
   );
 }
