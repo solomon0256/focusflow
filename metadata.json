@@ -1,0 +1,7 @@
+{
+  "name": "FocusFlow",
+  "description": "An iOS-style productivity app featuring a Pomodoro timer, task management, statistics with a pet system, and customizable settings.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
