@@ -1,97 +1,95 @@
-# FocusFlow AI 姿态检测技术方案 (Technical Specification)
 
-## 1. 核心目标
-在 iOS (via Capacitor) 和 Web 端实现一套**实时、低延迟、可离线**的专注度检测系统。该系统利用前置摄像头分析用户头部姿态，判断用户是否分心（低头、转头、趴桌子）。
+# FocusFlow AI 专注度检测技术方案 (Technical Specification) V2
 
----
-
-## 2. 技术选型与限制
-*   **核心引擎**: Google MediaPipe Tasks Vision (JavaScript/WASM 版本)。
-*   **为什么不用 Python?**: iOS 应用本质是 WebView 运行 JS，无法原生高效运行 Python 脚本。
-*   **为什么不用原生 Swift/Kotlin?**: 为了保持代码库统一 (React)，我们选择 WASM 方案，它可以在浏览器和 WebView 中利用 GPU 加速，性能接近原生。
-
----
-
-## 3. 部署策略 (最终确定的离线架构)
-
-经过对 iOS 沙盒机制和 Capacitor 资源加载的研究，我们放弃“压缩包解压”或“动态下载”方案，采用 **“静态资源打包 (Bundled Assets)”** 方案。
-
-### 3.1 方案描述
-将 AI 模型文件视为普通的静态资源（类似 `.png` 或 `.json`），直接放入项目的 `public` 目录。
-
-*   **路径规划**:
-    *   项目根目录: `/public/ai_resources/`
-    *   文件 1: `vision_wasm_internal.wasm` (WASM 运行时，约 4MB)
-    *   文件 2: `vision_wasm_internal.js` (加载器)
-    *   文件 3: `face_landmarker.task` (模型权重文件，约 1.5MB)
-
-### 3.2 为什么这样做？(可行性分析)
-1.  **iOS 合规性 (App Store)**: Apple 严禁 App 下载“可执行代码”。但 `.task` 文件是**数据**，`.wasm` 在 WebKit 内部运行，被视为 Web 内容。将其作为 App Bundle 的一部分打包是完全合规的。
-2.  **Capacitor 机制**: Capacitor 构建 iOS 应用时，会将 `dist/` (编译后的前端代码) 和 `public/` 目录下的所有文件完整拷贝到 iOS 的 App Bundle 中。
-3.  **访问方式**: 在运行时，这些文件可以通过相对路径 `./ai_resources/...` 或绝对路径 `/ai_resources/...` 访问。MediaPipe 引擎会像请求网络图片一样请求这些本地文件，无需任何解压操作。
-
-### 3.3 实施步骤
-1.  **下载资源**: 从 Google CDN 下载上述 3 个文件。
-2.  **存入项目**: 放入 `FocusFlow/public/ai_resources/`。
-3.  **代码修改**:
-    ```javascript
-    // 指向本地（相对于 index.html 的路径）
-    const filesetResolver = await FilesetResolver.forVisionTasks("./ai_resources/wasm");
-    const modelAssetPath = "./ai_resources/face_landmarker.task";
-    ```
-4.  **构建**: 运行 `npm run build` -> `npx cap sync`。
+## 1. 核心架构：全平台统一 WASM (Cross-Platform Architecture)
+*   **技术栈**: MediaPipe Tasks Vision (WebAssembly 版本).
+*   **兼容性确认**:
+    *   **iOS (Safari/WebView)**: 支持。依赖 WebGL 后端。
+    *   **Android (Chrome/WebView)**: 支持。依赖 WebGL 后端。
+    *   **PC Web**: 支持。
+*   **加载机制**: 
+    1.  App 启动时下载 `.wasm` (二进制引擎) 和 `.task` (模型权重) 到本地缓存。
+    2.  初始化 `FilesetResolver` 和 `PoseLandmarker`。
+    3.  **内存驻留**: 初始化完成后，模型常驻内存，后续检测无网络请求，零延迟。
+*   **选定模型**: **`PoseLandmarker (Lite)`**
+    *   *原因*: 这是一个“全能”模型。它不仅提供身体骨架（肩膀、手臂），还内置了面部网格（Face Mesh）。相比于同时运行 Face 和 Pose 两个模型，运行这一个模型的性能开销减半，且完全满足需求。
 
 ---
 
-## 4. 专注度判断算法 (Focus Algorithm)
+## 2. 场景定义：宽松的桌面模式 (Lenient Desk Mode)
 
-我们不使用简单的 `if` 判断，而是采用 **"积分衰减模型 (Score Decay Model)"**。
+**不做军训式的监控**。我们的目标是捕捉“明显的走神”和“长时间的疲劳”，容忍正常的生理活动（喝水、伸懒腰、短暂转头）。
 
-### 核心指标 (欧拉角估算)
-通过面部关键点 (鼻子、左耳、右耳) 计算头部角度：
-1.  **Pitch (俯仰角)**: 
-    *   *计算*: 鼻子 Y 坐标 vs 耳朵中心 Y 坐标。
-    *   *阈值*: > 25度 (低头)。
-    *   *判定*: 玩手机、打瞌睡。
-2.  **Yaw (偏航角)**:
-    *   *计算*: 鼻子 X 坐标 vs 耳朵中心 X 坐标。
-    *   *阈值*: > 30度 (左右转头)。
-    *   *判定*: 看旁边、与人交谈。
-3.  **Roll (翻滚角)**:
-    *   *计算*: 左耳 Y 坐标 vs 右耳 Y 坐标。
-    *   *阈值*: > 20度 (歪头)。
-    *   *判定*: 趴桌子、疲劳。
+### 2.1 核心检测因子与宽松阈值 (Thresholds)
 
-### 积分逻辑 (State Machine)
-*   **初始分**: 100 分。
-*   **状态**: `GOOD` (专注) / `DISTRACTED` (分心) / `BAD_POSTURE` (姿态差)。
-*   **扣分 (Decay)**: 当检测到不良状态时，每帧扣 `0.5` 分 (约每秒扣 15 分)。
-    *   *目的*: 允许用户短暂活动脖子，但惩罚长时间分心。
-*   **回血 (Recovery)**: 当姿态恢复正常时，每帧回 `0.1` 分 (约每秒回 3 分)。
-    *   *目的*: 鼓励用户纠正姿态。
-*   **报警阈值**: 当分数低于 60 分时，UI 变红并提示。
+我们采用 **“基准值 + 偏差区间”** 的算法，而不是写死的绝对角度。
+*在用户点击“开始专注”的前 3 秒，我们会记录他的姿态作为 `Base_Pose`。*
 
----
+| 维度 | 检测指标 | 宽松阈值 (Tolerance) | 判定逻辑 |
+| :--- | :--- | :--- | :--- |
+| **A. 头部姿态** | Pitch (低头/抬头) | **± 45°** (非常宽) | 允许大幅度低头写字或抬头看屏幕。只有完全趴下或仰头睡觉才触发。 |
+| **B. 头部转向** | Yaw (左右转头) | **± 40°** | 允许查阅侧面资料。只有完全扭头看别处才触发。 |
+| **C. 身体稳定性** | MMI (微动指数) | **High Variance** | 只有**剧烈**的持续晃动（如离开座位走动）或**死一样的静止**（判定为心流）才有意义。普通抖腿忽略。 |
+| **D. 肩部水平** | Roll (歪头杀) | **± 25°** | 允许稍微歪头思考。 |
+| **E. 疲劳检测** | 闭眼时长 | **> 1.5 秒** | 正常眨眼(0.2s)忽略。只有明显的闭目养神才计入疲劳。 |
 
-## 5. 初始化流程与错误处理 (Robustness)
+### 2.2 时间缓冲机制 (Time Buffer / Hysteresis)
 
-为了防止 App 卡死，我们设计了以下状态机：
+为了消除误报，我们引入 **5秒滑动窗口 (Sliding Window)**。
 
-1.  **INIT**: 界面加载。
-2.  **LOADING_WASM**: 尝试从本地加载 AI 引擎。
-3.  **LOADING_MODEL**: 尝试读取本地模型文件。
-4.  **STARTING_CAMERA**: 请求摄像头权限。
-5.  **READY**: 一切就绪，开始分析。
-6.  **ERROR**: 任何一步失败 (断网、拒绝权限)。
-
-**降级策略 (Fallback)**:
-如果进入 **ERROR** 状态，用户可以选择 **"Continue without AI" (跳过 AI)**。
-*   此时 App 变为普通番茄钟 + 纯摄像头预览（不进行分析）。
-*   **原则**: AI 是增强功能，不是阻断功能。软件必须在没有 AI 的情况下也能运行。
+*   **瞬时状态**: AI 每秒检测 10-15 次。
+*   **判定状态**: 
+    *   如果 AI 检测到 `Distracted`，**不立即报警**。
+    *   只有当 `Distracted` 状态在过去 5 秒内占比超过 **80%** 时，才正式切换 App 状态为“分心”。
+    *   *效果*: 你转头拿杯咖啡（2秒），AI 内部会标记为分心，但 App 界面保持“专注”，不会打断你。你玩手机超过 5 秒，App 界面变红。
 
 ---
 
-## 6. 下一步计划
-1.  在 Web 端调试现在的算法阈值，确保不会频繁误报。
-2.  确认阈值满意后，**下载文件并进行静态打包** (Step 3.3)。
-3.  配置 Capacitor 环境，进行真机测试。
+## 3. 四级专注状态机 (The 4-Level State Machine)
+
+基于 `PoseLandmarker` 的 33 个骨架点 + 面部特征。
+
+#### **Level 4: 心流 (Deep Flow)**
+*   **特征**: “雕塑般的静止”。
+*   **判定**: 
+    1.  `Face` 在正中区域 (Yaw < 15°)。
+    2.  `Shoulders` 极其稳定 (位移方差 < 0.002)。
+    3.  `Blink Rate` 低于 10次/分 (可选，视光线而定)。
+*   **反馈**: 界面显示绿色呼吸光环。
+
+#### **Level 3: 专注 (Focused) - 默认状态**
+*   **特征**: 正常的学习姿态。
+*   **判定**: 
+    1.  检测到人脸。
+    2.  姿态在允许的宽松阈值内 (Pitch < 45°, Yaw < 40°)。
+    3.  有正常的微小活动。
+*   **反馈**: 界面显示绿色静态圆环。
+
+#### **Level 2: 疲劳/游离 (Wandering)**
+*   **特征**: 姿态崩坏或闭眼。
+*   **判定**: 
+    1.  `Spine Angle` (脊柱倾角) 严重后仰或前趴 (偏离基准 > 30%)。
+    2.  或者：检测到闭眼 > 1.5秒。
+*   **反馈**: 界面变黄，提示“Rest your eyes?”。
+
+#### **Level 1: 分心 (Distracted)**
+*   **特征**: 人不在或完全背对屏幕。
+*   **判定**: 
+    1.  `Pose Visibility` < 0.5 (人走丢了)。
+    2.  或者：`Yaw` > 50° (持续 5 秒以上)。
+    3.  或者：`Hand` 举起在脸前持续不动 (高概率在玩手机/打电话)。
+*   **反馈**: 界面变红，暂停计时（可选）。
+
+---
+
+## 4. 实现路线图 (Implementation Plan)
+
+1.  **资源准备**: 
+    *   下载 `pose_landmarker_lite.task` (约 8MB) 放入项目。
+    *   下载 `wasm` 文件。
+2.  **代码替换**: 
+    *   修改 `FocusSessionView.tsx`。
+    *   从 `FaceLandmarker` 切换为 `PoseLandmarker`。
+    *   实现 `Calibration` (校准) 阶段：倒计时 3..2..1 时读取用户姿态作为 (0,0,0) 基准点。
+3.  **数据平滑**: 
+    *   实现简单的 `SmoothingFilter`，避免数值跳变。

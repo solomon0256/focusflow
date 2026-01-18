@@ -11,27 +11,19 @@
  */
 
 // We use 'any' for window.Capacitor to avoid TS errors without installing types yet
-const isNative = () => (window as any).Capacitor?.isNativePlatform();
-
-// Helper to safely import plugins only when needed (Optional, but good practice)
-// For this strict version, we assume plugins are available globally if isNative is true,
-// or we keep the import logic simple.
-// Since we can't dynamic import easily in this setup without complex bundler config,
-// we will simulate the bridge pattern.
-
-// NOTE: In a real build, you would import these at the top.
-// import { Preferences } from '@capacitor/preferences';
-// import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
-// import { KeepAwake } from '@capacitor/keep-awake';
-
-// Mocking the plugin calls for the XML output validity while explaining the logic
-// In your real Capacitor project, uncomment the imports above and remove these mocks if installed.
+// This check determines if we are running inside the Capacitor WebView container
+const checkIsNative = () => (window as any).Capacitor?.isNativePlatform() || false;
 
 export const NativeService = {
   
+  // Public accessor for environment checks
+  get isNative() {
+    return checkIsNative();
+  },
+
   Storage: {
     async get<T>(key: string): Promise<T | null> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // const { value } = await Preferences.get({ key });
         // return value ? JSON.parse(value) : null;
         console.log('Native Storage GET called (Simulated for now)');
@@ -51,7 +43,7 @@ export const NativeService = {
     },
 
     async set(key: string, value: any): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await Preferences.set({ key, value: JSON.stringify(value) });
         console.log('Native Storage SET called');
       } else {
@@ -69,7 +61,7 @@ export const NativeService = {
     },
 
     async remove(key: string): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await Preferences.remove({ key });
       } else {
         return new Promise((resolve) => {
@@ -82,7 +74,7 @@ export const NativeService = {
 
   Haptics: {
     async impactLight(): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await Haptics.impact({ style: ImpactStyle.Light });
       } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(10);
@@ -90,7 +82,7 @@ export const NativeService = {
     },
 
     async impactMedium(): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await Haptics.impact({ style: ImpactStyle.Medium });
       } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(20);
@@ -98,7 +90,7 @@ export const NativeService = {
     },
     
     async notificationSuccess(): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await Haptics.notification({ type: NotificationType.Success });
       } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([10, 30, 10]);
@@ -110,28 +102,41 @@ export const NativeService = {
     wakeLock: null as WakeLockSentinel | null,
 
     async keepAwake(): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await KeepAwake.keepAwake();
         console.log("Native KeepAwake called");
       } else {
+        // WEB FALLBACK
+        if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) {
+            return;
+        }
         try {
-          if ('wakeLock' in navigator && !this.wakeLock) {
+          if (!this.wakeLock) {
             this.wakeLock = await navigator.wakeLock.request('screen');
             console.log("Web WakeLock active");
           }
-        } catch (err) {
-          console.warn('Wake Lock denied', err);
+        } catch (err: any) {
+          // Gracefully handle permission errors common in iframes/previews
+          if (err.name === 'NotAllowedError' || err.message?.includes('denied')) {
+             console.log("WakeLock skipped: Environment restricts screen control.");
+          } else {
+             console.warn('Wake Lock Error:', err);
+          }
         }
       }
     },
 
     async allowSleep(): Promise<void> {
-      if (isNative()) {
+      if (checkIsNative()) {
         // await KeepAwake.allowSleep();
       } else {
         if (this.wakeLock) {
-          await this.wakeLock.release();
-          this.wakeLock = null;
+          try {
+            await this.wakeLock.release();
+            this.wakeLock = null;
+          } catch (e) {
+            // Ignore release errors
+          }
         }
       }
     }
