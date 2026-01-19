@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, Sliders, X, Plus, Minus } from 'lucide-react';
+import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar } from 'lucide-react';
 import { TimerMode, Task, Settings, Priority } from '../types';
-import { IOSSegmentedControl, IOSCard } from '../components/IOSComponents';
+import { IOSSegmentedControl } from '../components/IOSComponents';
 
 interface TimerViewProps {
   tasks: Task[];
@@ -56,9 +55,6 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   const [browsingTaskIndex, setBrowsingTaskIndex] = useState(0); 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
-  // Quick Settings State
-  const [showQuickSettings, setShowQuickSettings] = useState(false);
-
   // Auto-select logic
   useEffect(() => {
       if (sortedTasks.length === 0) return;
@@ -125,15 +121,6 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
 
       onStartSession(duration, mode, selectedTaskId || undefined);
   };
-  
-  // Handlers for Round Selection
-  const handleRoundSelect = (count: number) => {
-    setSettings(prev => ({ ...prev, pomodorosPerRound: count }));
-    // If a task was selected, deselect it to allow "Custom" mode to take over
-    if (selectedTaskId) {
-        setSelectedTaskId(null);
-    }
-  };
 
   const getPriorityColor = (p: Priority) => {
     switch (p) {
@@ -190,28 +177,16 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
       
         {/* 1. Header & Status */}
         <div className="mt-2 flex flex-col items-center z-10 w-full mx-auto relative">
-            <div className="w-full max-w-md mb-6 flex items-center gap-3">
-                <div className="flex-1">
-                  <IOSSegmentedControl 
-                      options={['Pomodoro', 'Stopwatch', 'Custom']} 
-                      selected={mode === TimerMode.POMODORO ? 'Pomodoro' : mode === TimerMode.STOPWATCH ? 'Stopwatch' : 'Custom'}
-                      onChange={(val) => {
-                          if(val === 'Pomodoro') setMode(TimerMode.POMODORO);
-                          else if (val === 'Stopwatch') setMode(TimerMode.STOPWATCH);
-                          else setMode(TimerMode.CUSTOM);
-                      }} 
-                  />
-                </div>
-                {mode === TimerMode.POMODORO && (
-                  <button 
-                    onClick={() => setShowQuickSettings(!showQuickSettings)}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm border
-                      ${showQuickSettings ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-400 border-gray-100'}
-                    `}
-                  >
-                    {showQuickSettings ? <X size={16} /> : <Sliders size={16} />}
-                  </button>
-                )}
+            <div className="w-full max-w-md mb-6">
+                <IOSSegmentedControl 
+                    options={['Pomodoro', 'Stopwatch', 'Custom']} 
+                    selected={mode === TimerMode.POMODORO ? 'Pomodoro' : mode === TimerMode.STOPWATCH ? 'Stopwatch' : 'Custom'}
+                    onChange={(val) => {
+                         if(val === 'Pomodoro') setMode(TimerMode.POMODORO);
+                         else if (val === 'Stopwatch') setMode(TimerMode.STOPWATCH);
+                         else setMode(TimerMode.CUSTOM);
+                    }} 
+                />
             </div>
 
             <div className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 text-gray-500 flex items-center gap-2`}>
@@ -224,66 +199,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </div>
         </div>
 
-        {/* 2. Middle Section: Preview OR Config */}
-        <div className="w-full relative z-10">
-            {/* Quick Settings Panel */}
-            <AnimatePresence initial={false}>
-              {showQuickSettings && mode === TimerMode.POMODORO ? (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden mb-4"
-                >
-                  <IOSCard className="p-4 bg-white/90 backdrop-blur-md !mb-0 border border-gray-100">
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Work Time */}
-                        <div className="col-span-2">
-                           <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-bold text-gray-400 uppercase">Focus Time</span>
-                              <span className="text-sm font-bold text-blue-600">{settings.workTime}m</span>
-                           </div>
-                           <input 
-                              type="range" min="5" max="90" step="5"
-                              value={settings.workTime}
-                              onChange={(e) => setSettings({...settings, workTime: parseInt(e.target.value)})}
-                              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                           />
-                        </div>
-                        
-                        {/* Breaks */}
-                        <div>
-                           <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-bold text-gray-400 uppercase">Short Break</span>
-                              <span className="text-sm font-bold text-amber-500">{settings.shortBreakTime}m</span>
-                           </div>
-                           <input 
-                              type="range" min="1" max="15" step="1"
-                              value={settings.shortBreakTime}
-                              onChange={(e) => setSettings({...settings, shortBreakTime: parseInt(e.target.value)})}
-                              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                           />
-                        </div>
-                        <div>
-                           <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-bold text-gray-400 uppercase">Long Break</span>
-                              <span className="text-sm font-bold text-emerald-500">{settings.longBreakTime}m</span>
-                           </div>
-                           <input 
-                              type="range" min="5" max="30" step="5"
-                              value={settings.longBreakTime}
-                              onChange={(e) => setSettings({...settings, longBreakTime: parseInt(e.target.value)})}
-                              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                           />
-                        </div>
-                      </div>
-                  </IOSCard>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            {/* POMODORO PREVIEW BAR */}
-            <div className={`w-full transition-opacity duration-300 min-h-[50px] ${mode === TimerMode.POMODORO && !showQuickSettings ? 'opacity-100 z-10' : 'opacity-0 z-0 h-0 overflow-hidden'}`}>
+        {/* 2. Middle Section */}
+        <div className="w-full min-h-[80px] flex items-center justify-center relative z-10">
+            {/* POMODORO PREVIEW */}
+            <div className={`w-full transition-opacity duration-300 absolute ${mode === TimerMode.POMODORO ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                 <div className="flex justify-between text-xs text-gray-500 mb-2 px-1 font-bold uppercase tracking-widest">
                     <span>Est. Cycle</span>
                     <span>{Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60)}m</span>
@@ -311,7 +230,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </div>
 
             {/* CUSTOM SLIDER */}
-            <div className={`w-full transition-opacity duration-300 ${mode === TimerMode.CUSTOM ? 'opacity-100 z-10' : 'opacity-0 z-0 h-0 overflow-hidden'}`}>
+            <div className={`w-full transition-opacity duration-300 absolute ${mode === TimerMode.CUSTOM ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex justify-between items-center mb-4">
                         <span className="text-sm font-bold text-gray-500 uppercase">Set Duration</span>
@@ -333,44 +252,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </div>
 
             {/* STOPWATCH */}
-            <div className={`w-full transition-opacity duration-300 ${mode === TimerMode.STOPWATCH ? 'opacity-100 z-10' : 'opacity-0 z-0 h-0 overflow-hidden'}`}>
+            <div className={`w-full transition-opacity duration-300 absolute ${mode === TimerMode.STOPWATCH ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                 <div className="bg-white/40 p-3 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2">
                     <Clock size={16} className="text-gray-400" />
                     <span className="text-sm text-gray-500">Stopwatch Mode Active</span>
-                </div>
-            </div>
-            
-            {/* ROUNDS SELECTOR (NEW) */}
-            <div className={`w-full transition-all duration-300 overflow-hidden ${mode === TimerMode.POMODORO ? 'opacity-100 max-h-24 mt-4' : 'opacity-0 max-h-0 mt-0'}`}>
-                <div className="flex flex-col items-center justify-center py-1">
-                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Custom Session</span>
-                     <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-                        {[1, 2, 3, 4].map(num => {
-                            const isActive = currentRounds === num;
-                            return (
-                                 <button
-                                    key={num}
-                                    onClick={() => handleRoundSelect(num)}
-                                    className={`w-10 h-8 rounded-lg font-bold text-sm transition-all duration-200 flex items-center justify-center
-                                        ${isActive 
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-105' 
-                                            : 'text-gray-400 hover:bg-gray-50'
-                                        }
-                                    `}
-                                >
-                                    {num}
-                                </button>
-                            );
-                        })}
-                        {/* Plus Button for extra rounds */}
-                         <div className="w-px h-5 bg-gray-200 mx-1" />
-                         <button 
-                            onClick={() => handleRoundSelect(Math.min(8, currentRounds + 1))}
-                            className="w-8 h-8 rounded-lg font-bold text-gray-400 hover:bg-gray-50 flex items-center justify-center active:scale-95"
-                         >
-                            <Plus size={16} />
-                         </button>
-                    </div>
                 </div>
             </div>
         </div>
