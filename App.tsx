@@ -84,9 +84,6 @@ function App() {
   }, []);
 
   // --- 3. Persistence Observers (Auto-Save) ---
-  // We use references or specific logic to avoid saving empty states during init
-  // But since we have isAppReady, we can guard against overwriting data with empty arrays during boot.
-
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.TASKS, tasks); }, [tasks, isAppReady]);
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.HISTORY, focusHistory); }, [focusHistory, isAppReady]);
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
@@ -158,6 +155,18 @@ function App() {
       }
   };
 
+  // Helper to open Settings tab and trigger upgrade flow
+  const handleUpgradeTrigger = () => {
+      setIsFocusSessionActive(false);
+      setCurrentSessionParams(null);
+      setActiveTab('settings');
+      // In a real app, we might pass a state to SettingsView to auto-open the modal
+      setTimeout(() => {
+          // This is a bit of a hack for the prototype, in real Redux/Context app we'd dispatch an action
+          alert("Please click 'View Offer' in Settings to upgrade!");
+      }, 300);
+  };
+
   const handleStartSession = (duration: number, mode: TimerMode, taskId?: string) => {
       NativeService.Haptics.impactMedium();
       setCurrentSessionParams({ durationMinutes: duration, mode, taskId });
@@ -204,8 +213,10 @@ function App() {
               mode={currentSessionParams.mode}
               initialTimeInSeconds={currentSessionParams.durationMinutes * 60}
               task={task}
+              user={user}
               onComplete={handleSessionComplete}
               onCancel={handleSessionCancel}
+              onUpgradeTrigger={handleUpgradeTrigger}
           />
       );
   }

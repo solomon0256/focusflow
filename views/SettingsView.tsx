@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud } from 'lucide-react';
+import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton } from '../components/IOSComponents';
 import { Settings, User, Product } from '../types';
 import { SAAS_CONFIG } from '../config';
@@ -46,13 +46,14 @@ interface SliderRowProps {
     onChange: (val: number) => void;
     min?: number;
     max?: number;
+    unit?: string;
 }
 
-const SliderRow = React.memo<SliderRowProps>(({ label, value, onChange, min = 0, max = 100 }) => (
+const SliderRow = React.memo<SliderRowProps>(({ label, value, onChange, min = 0, max = 100, unit = 'm' }) => (
       <div className="py-3">
           <div className="flex justify-between items-center mb-2">
              <span className="font-medium text-gray-900">{label}</span>
-             <span className="text-blue-600 font-bold w-12 text-right">{value}m</span>
+             <span className="text-blue-600 font-bold w-12 text-right">{value}{unit}</span>
           </div>
           <input 
             type="range" 
@@ -105,6 +106,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
            onUpgrade(); 
            alert("Premium restored!");
       }, 1000);
+  };
+
+  const handleReset = () => {
+      setSettings(prev => ({
+          ...prev,
+          workTime: 25,
+          shortBreakTime: 5,
+          longBreakTime: 15,
+          pomodorosPerRound: 4
+      }));
   };
 
   // --- Login Modal ---
@@ -322,7 +333,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           )}
        </IOSCard>
 
-       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">Timer Configuration</h2>
+       <div className="flex justify-between items-end mb-2 ml-2 mt-6 pr-2">
+           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Timer Configuration</h2>
+           <button 
+               onClick={handleReset}
+               className="text-[10px] font-bold text-blue-500 flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md active:scale-95 transition-transform"
+           >
+               <RotateCcw size={10} />
+               Reset
+           </button>
+       </div>
        <IOSCard className="px-4 py-1">
           <SliderRow 
             label="Focus Duration" 
@@ -346,6 +366,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
             onChange={(v) => setSettings({...settings, longBreakTime: v})}
             min={5}
             max={45}
+          />
+          <div className="border-t border-gray-100" />
+           <SliderRow 
+            label="Intervals" 
+            value={settings.pomodorosPerRound} 
+            onChange={(v) => setSettings({...settings, pomodorosPerRound: v})}
+            min={1}
+            max={10}
+            unit=""
           />
        </IOSCard>
 

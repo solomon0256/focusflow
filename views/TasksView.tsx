@@ -100,8 +100,9 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
   };
 
   // --- Calendar Strip Logic (Weekly) ---
-  const weekDays = useMemo(() => {
-    const days = [];
+  // Added <Date[]> to fix type inference
+  const weekDays = useMemo<Date[]>(() => {
+    const days: Date[] = [];
     const start = new Date(selectedDate);
     // Center the selected date roughly in the week view
     start.setDate(selectedDate.getDate() - 3);
@@ -124,7 +125,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
   };
 
   // --- All Tasks Grouped Logic ---
-  const groupedTasks = useMemo(() => {
+  // Added <Record<string, Task[]>> to fix type inference
+  const groupedTasks = useMemo<Record<string, Task[]>>(() => {
       const groups: Record<string, Task[]> = {};
       const sorted = [...tasks].sort((a,b) => {
           const dateA = new Date(a.date + (a.time ? 'T'+a.time : ''));

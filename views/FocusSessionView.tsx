@@ -1,17 +1,19 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User } from 'lucide-react';
-import { TimerMode, Task } from '../types';
+import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown } from 'lucide-react';
+import { TimerMode, Task, User } from '../types';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
 import { NativeService } from '../services/native';
+import { AdBanner } from '../components/AdBanner';
 
 interface FocusSessionViewProps {
   mode: TimerMode;
   initialTimeInSeconds: number;
   task?: Task;
+  user: User | null;
   onComplete: (minutesFocused: number) => void;
   onCancel: () => void;
+  onUpgradeTrigger: () => void;
 }
 
 // --- V2 STRATEGY CONFIGURATION ---
@@ -19,8 +21,8 @@ const HISTORY_WINDOW_SIZE = 60; // Approx 4-5 seconds at 15fps
 const DISTRACTION_THRESHOLD_PERCENT = 0.8; // Trigger alert if 80% of window is distracted
 
 // Thresholds relative to CALIBRATED BASELINE (Normalized coordinates 0-1)
-const THRESHOLD_YAW_DRIFT = 0.15; // How far nose can move left/right
-const THRESHOLD_PITCH_DROP = 0.20; // How far nose can drop (slouching)
+const THRESHOLD_YAW_DRIFT = 0.15; // How far nose can move left/right (FREE)
+const THRESHOLD_PITCH_DROP = 0.20; // How far nose can drop (slouching) (PAID)
 const THRESHOLD_MOVEMENT_VARIANCE = 0.005; // Stability threshold for Deep Focus
 
 // --- Asset Configuration ---
@@ -36,7 +38,7 @@ const calculateVariance = (arr: number[]) => {
     return arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / arr.length;
 };
 
-const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, task, onComplete, onCancel }) => {
+const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, task, user, onComplete, onCancel, onUpgradeTrigger }) => {
   // --- UI States ---
   const [sessionState, setSessionState] = useState<SessionState>('INIT');
   const [timeLeft, setTimeLeft] = useState(initialTimeInSeconds);
@@ -45,6 +47,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   
   // Countdown
   const [countdown, setCountdown] = useState(3);
+  
+  const isPremium = user?.isPremium || false;
 
   // AI & Feedback States
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -258,10 +262,21 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const dx = nose.x - calibration.noseBase.x; // + is Left(screen view), - is Right
       const dy = nose.y - calibration.noseBase.y; // + is Down(slouch), - is Up
 
-      // Check against Lenient Thresholds
-      const isPostureBad = 
-        Math.abs(dx) > THRESHOLD_YAW_DRIFT || // Moved too far left/right
-        dy > THRESHOLD_PITCH_DROP;            // Slouched too much (nose went down)
+      // Logic Split: Free vs Paid
+      const isYawBad = Math.abs(dx) > THRESHOLD_YAW_DRIFT; // Basic Distraction
+      const isPitchBad = dy > THRESHOLD_PITCH_DROP;        // Posture/Fatigue (Premium)
+
+      // Calculate 'Bad Posture'
+      let isPostureBad = false;
+      if (isYawBad) {
+          isPostureBad = true; // Everyone gets distracted by looking away
+      } else if (isPitchBad) {
+          // Only count Slouching as bad if user is Premium
+          if (isPremium) {
+              isPostureBad = true;
+          }
+          // Free users: Slouching is ignored (treated as Good posture)
+      }
 
       // 3. STABILITY CALCULATION (MMI)
       // Push to history
@@ -404,12 +419,27 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         </h2>
                         {!isAiDisabled && (
                             <div className="flex flex-col gap-1 mt-2">
-                                <div className="flex items-center gap-1.5">
-                                    <span className={`w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)] ${isVideoReady ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                                    <span className={`text-[10px] font-bold tracking-wider uppercase ${isVideoReady ? 'text-green-400' : 'text-yellow-400'}`}>
-                                        Desk Mode V2
-                                    </span>
+                                <div className="flex items-center gap-2">
+                                    {/* Feature Status Indicators */}
+                                    {!isPremium ? (
+                                        <div className="flex gap-2">
+                                            <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 text-green-400 backdrop-blur-md rounded-md border border-green-500/50">
+                                                <Zap size={10} fill="currentColor" />
+                                                <span className="text-[10px] font-bold uppercase">Focus Guard</span>
+                                            </div>
+                                            <button onClick={onUpgradeTrigger} className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/20 text-yellow-400 backdrop-blur-md rounded-md border border-yellow-500/30">
+                                                <Crown size={10} fill="currentColor"/>
+                                                <span className="text-[10px] font-bold uppercase">Pro: Posture</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 px-2 py-1 bg-gradient-to-r from-green-500/30 to-blue-500/30 text-white backdrop-blur-md rounded-md border border-white/20">
+                                            <ScanFace size={10} />
+                                            <span className="text-[10px] font-bold uppercase">Full Body AI</span>
+                                        </div>
+                                    )}
                                 </div>
+
                                 {/* DEBUGGER */}
                                 <div className="flex items-center gap-2 mt-1">
                                     <div className="flex items-center gap-1 opacity-60">
@@ -442,7 +472,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                             <div className="absolute inset-0 flex items-center justify-center text-white">
                                 {focusState === 'DEEP_FLOW' ? <Brain size={20} className="text-indigo-400" /> : 
                                  focusState === 'DISTRACTED' ? <AlertTriangle size={20} className="text-red-500" /> :
-                                 <User size={20} className="text-green-400" />}
+                                 <UserIcon size={20} className="text-green-400" />}
                             </div>
                         </div>
                     )}
@@ -495,22 +525,33 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                     </div>
                 </div>
 
-                {/* Footer Controls */}
-                <div className="relative w-full pb-safe px-10 mb-12 flex items-center justify-around pointer-events-auto">
-                    <button onClick={onCancel} className="w-16 h-16 rounded-full bg-gray-800/60 backdrop-blur-md flex items-center justify-center text-white/70 hover:bg-gray-700 transition-colors">
-                        <X size={28} />
-                    </button>
+                {/* Footer Controls + Ad Banner */}
+                <div className="relative w-full pb-safe mb-8 flex flex-col justify-end pointer-events-auto">
+                    
+                    {/* Controls */}
+                    <div className="flex items-center justify-around mb-8 px-10">
+                        <button onClick={onCancel} className="w-16 h-16 rounded-full bg-gray-800/60 backdrop-blur-md flex items-center justify-center text-white/70 hover:bg-gray-700 transition-colors">
+                            <X size={28} />
+                        </button>
 
-                    <button 
-                        onClick={() => { setIsPaused(!isPaused); NativeService.Haptics.impactMedium(); }}
-                        className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center shadow-2xl active:scale-95 transition-transform"
-                    >
-                        {isPaused ? <Play size={32} fill="black" className="ml-1" /> : <Pause size={32} fill="black" />}
-                    </button>
+                        <button 
+                            onClick={() => { setIsPaused(!isPaused); NativeService.Haptics.impactMedium(); }}
+                            className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center shadow-2xl active:scale-95 transition-transform"
+                        >
+                            {isPaused ? <Play size={32} fill="black" className="ml-1" /> : <Pause size={32} fill="black" />}
+                        </button>
 
-                    <button onClick={handleStop} className="w-16 h-16 rounded-full bg-red-500/80 backdrop-blur-md flex items-center justify-center text-white hover:bg-red-600 transition-colors">
-                        <Square size={24} fill="currentColor" />
-                    </button>
+                        <button onClick={handleStop} className="w-16 h-16 rounded-full bg-red-500/80 backdrop-blur-md flex items-center justify-center text-white hover:bg-red-600 transition-colors">
+                            <Square size={24} fill="currentColor" />
+                        </button>
+                    </div>
+
+                    {/* Ad Banner (Only for Free Users) */}
+                    {!isPremium && (
+                        <div className="relative z-20">
+                            <AdBanner onRemoveAds={onUpgradeTrigger} />
+                        </div>
+                    )}
                 </div>
             </div>
         )}

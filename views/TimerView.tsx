@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar } from 'lucide-react';
+import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { TimerMode, Task, Settings, Priority } from '../types';
 import { IOSSegmentedControl } from '../components/IOSComponents';
 
@@ -35,6 +35,24 @@ const minutesToSliderValue = (min: number) => {
     return 60 + Math.floor((min - 60) / 5);
 };
 
+// Quick Settings Slider Component
+const QuickSlider = ({ label, value, onChange, max, colorClass, unit = 'm' }: { label: string, value: number, onChange: (v: number) => void, max: number, colorClass: string, unit?: string }) => (
+    <div>
+        <div className="flex justify-between items-center mb-1.5">
+            <span className="text-sm font-medium text-gray-700">{label}</span>
+            <span className={`text-sm font-bold font-mono ${colorClass}`}>{value}{unit}</span>
+        </div>
+        <input 
+            type="range" 
+            min="1" 
+            max={max}
+            value={value}
+            onChange={(e) => onChange(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-blue-500"
+        />
+    </div>
+);
+
 const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onStartSession }) => {
   
   // 1. Sort active tasks chronologically
@@ -50,6 +68,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   }, [tasks]);
   
   const [mode, setMode] = useState<TimerMode>(TimerMode.POMODORO);
+  const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
   
   // Task selection state
   const [browsingTaskIndex, setBrowsingTaskIndex] = useState(0); 
@@ -122,6 +141,16 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
       onStartSession(duration, mode, selectedTaskId || undefined);
   };
 
+  const handleReset = () => {
+      setSettings(prev => ({
+          ...prev,
+          workTime: 25,
+          shortBreakTime: 5,
+          longBreakTime: 15,
+          pomodorosPerRound: 4
+      }));
+  };
+
   const getPriorityColor = (p: Priority) => {
     switch (p) {
         case Priority.HIGH: return 'bg-red-500';
@@ -177,16 +206,30 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
       
         {/* 1. Header & Status */}
         <div className="mt-2 flex flex-col items-center z-10 w-full mx-auto relative">
-            <div className="w-full max-w-md mb-6">
-                <IOSSegmentedControl 
-                    options={['Pomodoro', 'Stopwatch', 'Custom']} 
-                    selected={mode === TimerMode.POMODORO ? 'Pomodoro' : mode === TimerMode.STOPWATCH ? 'Stopwatch' : 'Custom'}
-                    onChange={(val) => {
-                         if(val === 'Pomodoro') setMode(TimerMode.POMODORO);
-                         else if (val === 'Stopwatch') setMode(TimerMode.STOPWATCH);
-                         else setMode(TimerMode.CUSTOM);
-                    }} 
-                />
+            {/* Control Strip */}
+            <div className="flex items-center gap-3 w-full max-w-md mb-6">
+                <div className="flex-1">
+                    <IOSSegmentedControl 
+                        options={['Pomodoro', 'Stopwatch', 'Custom']} 
+                        selected={mode === TimerMode.POMODORO ? 'Pomodoro' : mode === TimerMode.STOPWATCH ? 'Stopwatch' : 'Custom'}
+                        onChange={(val) => {
+                            if(val === 'Pomodoro') setMode(TimerMode.POMODORO);
+                            else if (val === 'Stopwatch') setMode(TimerMode.STOPWATCH);
+                            else setMode(TimerMode.CUSTOM);
+                            setIsQuickSettingsOpen(false); // Close settings on mode switch
+                        }} 
+                    />
+                </div>
+                {/* Quick Action Button (Settings Toggle) */}
+                <button 
+                    onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-md active:scale-95 transition-transform duration-200
+                        ${isQuickSettingsOpen ? 'bg-gray-500' : 'bg-blue-500'}
+                        ${mode !== TimerMode.POMODORO ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+                    `}
+                >
+                    {isQuickSettingsOpen ? <X size={18} /> : <SlidersHorizontal size={18} />}
+                </button>
             </div>
 
             <div className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 text-gray-500 flex items-center gap-2`}>
@@ -199,68 +242,132 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </div>
         </div>
 
-        {/* 2. Middle Section */}
-        <div className="w-full min-h-[80px] flex items-center justify-center relative z-10">
-            {/* POMODORO PREVIEW */}
-            <div className={`w-full transition-opacity duration-300 absolute ${mode === TimerMode.POMODORO ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                <div className="flex justify-between text-xs text-gray-500 mb-2 px-1 font-bold uppercase tracking-widest">
-                    <span>Est. Cycle</span>
-                    <span>{Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60)}m</span>
-                </div>
-                <div className="h-12 w-full bg-white/90 backdrop-blur-md rounded-2xl p-2 shadow-sm flex gap-1.5 relative overflow-hidden border border-white/40">
-                    {timelineSegments.map((seg, idx) => {
-                        let activeBg = 'bg-gray-100';
-                        if (seg.type === 'work') activeBg = 'bg-rose-100';
-                        else if (seg.type === 'shortBreak') activeBg = 'bg-amber-100';
-                        else if (seg.type === 'longBreak') activeBg = 'bg-emerald-100';
+        {/* 2. Middle Section - Dynamic Flow Layout */}
+        <div className="w-full relative z-10 min-h-[100px] flex flex-col justify-center mb-2">
+            <AnimatePresence mode="wait">
+                {mode === TimerMode.POMODORO && (
+                    <motion.div
+                        key="pomodoro-block"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="w-full"
+                    >
+                        {/* Timeline Area - Always Visible */}
+                        <div className="w-full">
+                            <div className="flex justify-between text-xs text-gray-500 mb-2 px-1 font-bold uppercase tracking-widest">
+                                <span>Est. Cycle</span>
+                                <span>{Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60)}m</span>
+                            </div>
+                            
+                            <div className="h-12 w-full bg-white/90 backdrop-blur-md rounded-2xl p-2 shadow-sm flex gap-1.5 relative overflow-hidden border-2 border-blue-200 transition-all">
+                                {timelineSegments.map((seg, idx) => {
+                                    let activeBg = 'bg-gray-100';
+                                    if (seg.type === 'work') activeBg = 'bg-rose-100';
+                                    else if (seg.type === 'shortBreak') activeBg = 'bg-amber-100';
+                                    else if (seg.type === 'longBreak') activeBg = 'bg-emerald-100';
 
-                        return (
-                        <div 
-                            key={idx}
-                            className={`h-full rounded-lg relative flex items-center justify-center ${activeBg}`}
-                            style={{ flex: seg.duration }}
-                        >
-                            {seg.type === 'work' && <Zap size={12} className="text-rose-400" />}
-                            {seg.type === 'shortBreak' && <Coffee size={12} className="text-amber-400" />}
-                            {seg.type === 'longBreak' && <Armchair size={12} className="text-emerald-400" />}
+                                    return (
+                                    <div 
+                                        key={idx}
+                                        className={`h-full rounded-lg relative flex items-center justify-center ${activeBg}`}
+                                        style={{ flex: seg.duration }}
+                                    >
+                                        {seg.type === 'work' && <Zap size={12} className="text-rose-400" />}
+                                        {seg.type === 'shortBreak' && <Coffee size={12} className="text-amber-400" />}
+                                        {seg.type === 'longBreak' && <Armchair size={12} className="text-emerald-400" />}
+                                    </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            <div className="flex justify-between mt-1 text-[10px] text-blue-400 font-bold px-1">
+                                <span>Focus Time: {settings.workTime}m</span>
+                                <span>Break: {settings.shortBreakTime}m</span>
+                            </div>
                         </div>
-                        );
-                    })}
-                </div>
-            </div>
 
-            {/* CUSTOM SLIDER */}
-            <div className={`w-full transition-opacity duration-300 absolute ${mode === TimerMode.CUSTOM ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="text-sm font-bold text-gray-500 uppercase">Set Duration</span>
-                        <span className="text-xl font-mono font-bold text-blue-600">{customDuration}m</span>
-                    </div>
-                    <input 
-                        type="range" 
-                        min="1" 
-                        max={SLIDER_MAX}
-                        step="1"
-                        value={minutesToSliderValue(customDuration)}
-                        onChange={(e) => {
-                             const val = sliderValueToMinutes(parseInt(e.target.value));
-                             setCustomDuration(val);
-                        }}
-                        className="w-full h-4 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-500"
-                    />
-                </div>
-            </div>
+                        {/* Collapsible Settings Panel (Expands Below) */}
+                        <AnimatePresence>
+                            {isQuickSettingsOpen && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                                    animate={{ height: "auto", opacity: 1, marginTop: 12 }}
+                                    exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                                    className="overflow-hidden"
+                                >
+                                     <div className="bg-white/80 backdrop-blur-xl p-5 rounded-3xl shadow-sm border border-white/50 w-full">
+                                         <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Quick Adjustment</span>
+                                            <button 
+                                                onClick={handleReset}
+                                                className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md active:scale-95 transition-transform"
+                                            >
+                                                <RotateCcw size={10} />
+                                                RESET
+                                            </button>
+                                         </div>
+                                         <div className="space-y-5">
+                                             <QuickSlider label="Focus" value={settings.workTime} onChange={v => setSettings({...settings, workTime: v})} max={90} colorClass="text-rose-500" />
+                                             <QuickSlider label="Short Break" value={settings.shortBreakTime} onChange={v => setSettings({...settings, shortBreakTime: v})} max={30} colorClass="text-amber-500" />
+                                             <QuickSlider label="Long Break" value={settings.longBreakTime} onChange={v => setSettings({...settings, longBreakTime: v})} max={45} colorClass="text-emerald-500" />
+                                             <div className="border-t border-gray-100 my-2" />
+                                             <QuickSlider label="Intervals" value={settings.pomodorosPerRound} onChange={v => setSettings({...settings, pomodorosPerRound: v})} max={10} colorClass="text-indigo-500" unit="" />
+                                         </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </motion.div>
+                )}
 
-            {/* STOPWATCH */}
-            <div className={`w-full transition-opacity duration-300 absolute ${mode === TimerMode.STOPWATCH ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-                <div className="bg-white/40 p-3 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2">
-                    <Clock size={16} className="text-gray-400" />
-                    <span className="text-sm text-gray-500">Stopwatch Mode Active</span>
-                </div>
-            </div>
+                {mode === TimerMode.CUSTOM && (
+                    <motion.div
+                        key="custom-block"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="w-full"
+                    >
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-sm font-bold text-gray-500 uppercase">Set Duration</span>
+                                <span className="text-xl font-mono font-bold text-blue-600">{customDuration}m</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="1" 
+                                max={SLIDER_MAX}
+                                step="1"
+                                value={minutesToSliderValue(customDuration)}
+                                onChange={(e) => {
+                                     const val = sliderValueToMinutes(parseInt(e.target.value));
+                                     setCustomDuration(val);
+                                }}
+                                className="w-full h-4 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-500"
+                            />
+                        </div>
+                    </motion.div>
+                )}
+
+                {mode === TimerMode.STOPWATCH && (
+                     <motion.div
+                        key="stopwatch-block"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="w-full"
+                     >
+                        <div className="bg-white/40 p-3 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2">
+                            <Clock size={16} className="text-gray-400" />
+                            <span className="text-sm text-gray-500">Stopwatch Mode Active</span>
+                        </div>
+                     </motion.div>
+                )}
+            </AnimatePresence>
         </div>
 
-        {/* 3. Task Slider */}
+        {/* 3. Task Slider (Naturally pushed down by flow layout) */}
         <div className="flex-none flex flex-col justify-center relative z-20">
             <div className="flex items-center justify-between mb-2 px-2">
                 <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Select Task</span>
