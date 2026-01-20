@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug } from 'lucide-react';
+import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle } from 'lucide-react';
 import { TimerMode, Task, User, Settings } from '../types';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
 import { NativeService } from '../services/native';
@@ -13,7 +13,7 @@ interface FocusSessionViewProps {
   settings: Settings;
   task?: Task;
   user: User | null;
-  onComplete: (minutesFocused: number) => void;
+  onComplete: (minutesFocused: number, taskCompleted?: boolean) => void;
   onCancel: () => void;
   onUpgradeTrigger: () => void;
 }
@@ -76,6 +76,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   // Notification Toast State
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
 
+  // Summary Screen State
+  const [isTaskCompleted, setIsTaskCompleted] = useState(false);
+  const [didFinishNaturally, setDidFinishNaturally] = useState(false);
+
   // Stats Accumulator
   const totalFocusedSecondsRef = useRef(0);
   const sessionHistoryRef = useRef<SessionSegmentLog[]>([]);
@@ -130,6 +134,15 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       if (mode === TimerMode.STOPWATCH) return settings.stopwatchNotifications || [];
       return [];
   }, [mode, settings]);
+
+  // Determine the target number of rounds for Pomodoro mode
+  // Priority: Task setting > Global setting
+  const targetRounds = useMemo(() => {
+      if (mode === TimerMode.POMODORO && task?.pomodoroCount) {
+          return task.pomodoroCount;
+      }
+      return settings.pomodorosPerRound;
+  }, [mode, task, settings.pomodorosPerRound]);
 
   // 0. Wake Lock
   useEffect(() => {
@@ -359,15 +372,20 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                       setRoundsCompleted(newRounds);
                       NativeService.Haptics.notificationSuccess();
 
-                      if (mode === TimerMode.POMODORO && newRounds < settings.pomodorosPerRound) {
+                      // Use targetRounds here instead of settings.pomodorosPerRound
+                      if (mode === TimerMode.POMODORO && newRounds < targetRounds) {
                           setPhase('SHORT_BREAK');
                           return settings.shortBreakTime * 60;
-                      } else if (mode === TimerMode.POMODORO && newRounds >= settings.pomodorosPerRound) {
+                      } else if (mode === TimerMode.POMODORO && newRounds >= targetRounds) {
+                          // End of set -> Long Break (which finishes session after) or Direct Finish?
+                          // Standard flow: Work -> Break -> Work -> Long Break. 
+                          // Here we treat hitting targetRounds as time for Long Break.
                           setPhase('LONG_BREAK');
                           return settings.longBreakTime * 60;
                       } else {
+                          // Fallback
                           clearInterval(interval);
-                          handleShowSummary();
+                          handleShowSummary(true); 
                           return 0;
                       }
                   } 
@@ -378,7 +396,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                   }
                   else if (phase === 'LONG_BREAK') {
                       clearInterval(interval);
-                      handleShowSummary(); 
+                      handleShowSummary(true); 
                       return 0;
                   }
                   return 0;
@@ -387,9 +405,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           });
       }, 1000);
       return () => clearInterval(interval);
-  }, [sessionState, isPaused, phase, roundsCompleted, settings, mode, activeNotifications]);
+  }, [sessionState, isPaused, phase, roundsCompleted, settings, mode, activeNotifications, targetRounds]);
 
-  const handleShowSummary = () => {
+  const handleShowSummary = (naturalFinish: boolean = false) => {
       // If Stopwatch mode (manual stop), record actual elapsed time
       if (mode === TimerMode.STOPWATCH) {
           const elapsedMinutes = totalFocusedSecondsRef.current / 60;
@@ -398,13 +416,22 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           }
       }
 
+      setDidFinishNaturally(naturalFinish);
+      
+      // Auto-check task logic: Only if Pomodoro AND Natural Finish
+      if (mode === TimerMode.POMODORO && naturalFinish) {
+          setIsTaskCompleted(true);
+      } else {
+          setIsTaskCompleted(false);
+      }
+
       setSessionState('SUMMARY');
       NativeService.Haptics.notificationSuccess();
   };
 
   const handleFinish = () => {
       const minutes = totalFocusedSecondsRef.current / 60;
-      onComplete(Number(minutes.toFixed(1)));
+      onComplete(Number(minutes.toFixed(1)), isTaskCompleted);
   };
 
   const skipBreak = () => {
@@ -413,7 +440,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           setTimeLeft(settings.workTime * 60);
           NativeService.Haptics.impactMedium();
       } else if (phase === 'LONG_BREAK') {
-          handleShowSummary();
+          handleShowSummary(true);
       }
   };
 
@@ -469,9 +496,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           const currentYaw = smoothYawRef.current;
           const approxDegrees = currentYaw * 90;
 
-          // [TODO: AI_CONNECTION] Increment distraction counter if looking away
-          // if (Math.abs(approxDegrees) > 40) currentSegmentMetrics.current.distractions++;
-
           ctx.fillStyle = "#FFFFFF";
           ctx.fillText(`Points: ${landmarks.length}`, 20, 70);
           
@@ -522,7 +546,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const m = Math.floor((seconds % 3600) / 60);
       const s = seconds % 60;
       
-      // Show Hours if > 0
       if (h > 0) {
           return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
       }
@@ -666,6 +689,39 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                     </div>
 
                     <div className="px-6 mt-8 space-y-4 pb-20 relative z-10">
+                        
+                        {/* TASK COMPLETION CARD */}
+                        {task && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div 
+                                        onClick={() => {
+                                            setIsTaskCompleted(!isTaskCompleted);
+                                            NativeService.Haptics.impactLight();
+                                        }}
+                                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors
+                                            ${isTaskCompleted ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white'}
+                                        `}
+                                    >
+                                        {isTaskCompleted && <CheckCircle2 size={18} className="text-white" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-gray-900 line-clamp-1">{task.title}</h3>
+                                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                            {isTaskCompleted 
+                                                ? t.taskCompleted 
+                                                : (didFinishNaturally ? t.markAsDone : t.earlyStop)
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
                         {/* 1. Main Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white p-5 rounded-2xl shadow-sm">
@@ -730,49 +786,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                 </div>
                             )}
                             <div className="border-t border-gray-100 mt-0 w-full" />
-                        </div>
-                        
-                        {/* 3. Session Log List */}
-                        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                             <div className="px-5 py-4 border-b border-gray-50 flex justify-between">
-                                 <h3 className="font-bold text-gray-800">{t.cycleLog}</h3>
-                                 <span className="text-xs text-gray-400">{sessionHistoryRef.current.length} Cycles</span>
-                             </div>
-                             <div>
-                                 {sessionHistoryRef.current.length === 0 ? (
-                                     <div className="p-4 text-center text-sm text-gray-400">No data recorded.</div>
-                                 ) : (
-                                     sessionHistoryRef.current.map((log, idx) => (
-                                         <div key={idx} className="px-5 py-4 border-b border-gray-50 last:border-none">
-                                             <div className="flex items-center justify-between mb-2">
-                                                 <div className="flex items-center gap-3">
-                                                     <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-xs font-bold">
-                                                         {idx + 1}
-                                                     </div>
-                                                     <div>
-                                                         <div className="text-sm font-bold text-gray-900">{log.startTime}</div>
-                                                         <div className="text-xs text-gray-400">{formatMinutes(log.durationMinutes)}</div>
-                                                     </div>
-                                                 </div>
-                                                 <div className="text-right">
-                                                     <div className="text-sm font-bold text-green-600">{Math.round(log.avgFocusScore)}%</div>
-                                                 </div>
-                                             </div>
-                                             
-                                             <div className="grid grid-cols-2 gap-2 mt-2">
-                                                 <div className="bg-gray-50 rounded-lg p-2 flex items-center gap-2">
-                                                     <Move size={12} className="text-gray-400"/>
-                                                     <span className="text-[10px] text-gray-500">{t.posture}: <span className="font-bold text-gray-700">{log.postureQuality}</span></span>
-                                                 </div>
-                                                 <div className="bg-gray-50 rounded-lg p-2 flex items-center gap-2">
-                                                     <Eye size={12} className="text-gray-400"/>
-                                                     <span className="text-[10px] text-gray-500">Eye Fatigue: <span className="font-bold text-gray-700">{log.eyeFatigueLevel}</span></span>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     ))
-                                 )}
-                             </div>
                         </div>
                     </div>
 
@@ -850,17 +863,17 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                              focusState === 'DISTRACTED' ? <AlertTriangle size={20} className="text-red-500" /> :
                              <UserIcon size={20} className="text-green-400" />}
                         </div>
-                        
-                        {/* DEBUG BUTTON */}
-                        <button 
-                            onClick={handleDebugFastForward}
-                            className="absolute top-0 right-[-60px] bg-red-500/80 hover:bg-red-600/90 text-white p-2 rounded-full shadow-lg backdrop-blur-sm pointer-events-auto flex items-center justify-center active:scale-95 transition-transform"
-                            title="Debug: Add 30 mins"
-                        >
-                            <Bug size={16} />
-                        </button>
                     </div>
                 </div>
+
+                {/* DEBUG BUTTON: Moved to Bottom Left, High Z-Index, Red Color */}
+                <button 
+                    onClick={handleDebugFastForward}
+                    className="absolute bottom-28 left-6 z-[60] bg-red-600/90 text-white w-12 h-12 rounded-full shadow-2xl border-2 border-white/20 flex items-center justify-center pointer-events-auto active:scale-95 transition-transform"
+                    title="Debug: Add 30 mins"
+                >
+                    <Bug size={24} />
+                </button>
 
                 {/* Middle: Timer & Alerts */}
                 <div className="relative flex flex-col items-center justify-center drop-shadow-2xl">
@@ -913,7 +926,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         ) : (
                              mode === TimerMode.POMODORO && (
                                 <div className="flex justify-center gap-1 mt-2">
-                                    {[...Array(settings.pomodorosPerRound)].map((_, i) => (
+                                    {[...Array(targetRounds)].map((_, i) => (
                                         <div key={i} className={`w-2 h-2 rounded-full ${i < roundsCompleted ? 'bg-green-500' : (i === roundsCompleted) ? 'bg-white animate-pulse' : 'bg-gray-600'}`} />
                                     ))}
                                 </div>
@@ -925,8 +938,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                 {/* Footer Controls + Ad Banner */}
                 <div className="relative w-full pb-safe mb-8 flex flex-col justify-end pointer-events-auto">
                     <div className="flex items-center justify-around mb-8 px-10">
-                        <button onClick={onCancel} className="w-16 h-16 rounded-full bg-gray-800/60 backdrop-blur-md flex items-center justify-center text-white/70 hover:bg-gray-700 transition-colors">
-                            <X size={28} />
+                        <button onClick={handleShowSummary.bind(null, false)} className="w-16 h-16 rounded-full bg-gray-800/60 backdrop-blur-md flex items-center justify-center text-white/70 hover:bg-gray-700 transition-colors">
+                            <Square size={24} fill="currentColor" />
                         </button>
                         <button 
                             onClick={() => { setIsPaused(!isPaused); NativeService.Haptics.impactMedium(); }}
@@ -934,9 +947,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         >
                             {isPaused ? <Play size={32} fill="black" className="ml-1" /> : <Pause size={32} fill="black" />}
                         </button>
-                        <button onClick={handleShowSummary} className="w-16 h-16 rounded-full bg-red-500/80 backdrop-blur-md flex items-center justify-center text-white hover:bg-red-600 transition-colors">
-                            <Square size={24} fill="currentColor" />
-                        </button>
+                        {/* Placeholder for symmetry or other action */}
+                        <div className="w-16 h-16" />
                     </div>
 
                     {!isPremium && (

@@ -224,10 +224,18 @@ function App() {
       setIsFocusSessionActive(true);
   };
 
-  const handleSessionComplete = (minutes: number) => {
+  const handleSessionComplete = (minutes: number, taskCompleted: boolean = false) => {
       if (currentSessionParams) {
           addFocusRecord(minutes, currentSessionParams.mode);
           
+          // --- TASK COMPLETION UPDATE ---
+          if (currentSessionParams.taskId && taskCompleted) {
+              const taskId = currentSessionParams.taskId;
+              setTasks(prevTasks => prevTasks.map(t => 
+                  t.id === taskId ? { ...t, completed: true } : t
+              ));
+          }
+
           // --- PET SYSTEM: ADD EXP ---
           // Rule: If focus duration > 0.1 hours (approx 5-6 mins) AND haven't claimed today, add +5 EXP.
           if (user && minutes >= 5) {
@@ -260,7 +268,6 @@ function App() {
                       }
                   };
                   setUser(updatedUser);
-                  // Optional: Show toast via NativeService or local state in next render
               }
           }
       }
