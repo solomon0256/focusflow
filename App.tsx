@@ -218,6 +218,14 @@ function App() {
       }, 300);
   };
 
+  // --- DEVELOPER: Inject Simulated Data ---
+  const handleInjectData = (newTasks: Task[], newHistory: FocusRecord[], newUser: User) => {
+      setTasks(newTasks);
+      setFocusHistory(newHistory);
+      setUser(newUser);
+      NativeService.Haptics.notificationSuccess();
+  };
+
   const handleStartSession = (duration: number, mode: TimerMode, taskId?: string) => {
       NativeService.Haptics.impactMedium();
       setCurrentSessionParams({ durationMinutes: duration, mode, taskId });
@@ -345,6 +353,7 @@ function App() {
             onLogin={handleLogin}
             onLogout={handleLogout}
             onUpgrade={handleUpgrade}
+            onInjectData={handleInjectData}
         />;
       default:
         return <TimerView tasks={tasks} settings={settings} setSettings={setSettings} onRecordTime={addFocusRecord} onStartSession={handleStartSession}/>;
