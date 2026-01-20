@@ -57,10 +57,12 @@ interface SessionSegmentLog {
 }
 
 // Helper to format minutes into "1h 30m" or "45m"
+// UPDATED: Fixed floating point precision issues
 const formatMinutes = (m: number) => {
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    const min = m % 60;
+    const totalMin = Math.round(m);
+    if (totalMin < 60) return `${totalMin}m`;
+    const h = Math.floor(totalMin / 60);
+    const min = totalMin % 60;
     if (min === 0) return `${h}h`;
     return `${h}h ${min}m`;
 };
@@ -90,6 +92,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   // Stats Accumulator
   const totalFocusedSecondsRef = useRef(0);
+  const currentCycleElapsedRef = useRef(0); // Track time in current phase for accurate stats
   const sessionHistoryRef = useRef<SessionSegmentLog[]>([]);
   
   // [TODO: AI_CONNECTION] Live accumulator for the current running session
@@ -355,8 +358,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const interval = setInterval(() => {
           setTimeLeft((prev) => {
               if (phase === 'WORK') {
-                  // Increment Total Elapsed Seconds
+                  // Increment Stats Trackers
                   totalFocusedSecondsRef.current += 1;
+                  currentCycleElapsedRef.current += 1;
                   
                   // --- NOTIFICATION TRIGGER LOGIC (ELAPSED TIME) ---
                   const elapsedSeconds = totalFocusedSecondsRef.current;
@@ -382,7 +386,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               if (prev <= 1) {
                   // Timer Finished
                   if (phase === 'WORK') {
-                      recordCycleStats(settings.workTime); // Use config time for full sessions
+                      // UPDATED: Record exact elapsed time of this cycle, not just config time
+                      const elapsedMins = currentCycleElapsedRef.current / 60;
+                      recordCycleStats(elapsedMins); 
+                      currentCycleElapsedRef.current = 0; // Reset for next cycle
 
                       const newRounds = roundsCompleted + 1;
                       setRoundsCompleted(newRounds);
@@ -393,9 +400,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                           setPhase('SHORT_BREAK');
                           return settings.shortBreakTime * 60;
                       } else if (mode === TimerMode.POMODORO && newRounds >= targetRounds) {
-                          // End of set -> Long Break (which finishes session after) or Direct Finish?
-                          // Standard flow: Work -> Break -> Work -> Long Break. 
-                          // Here we treat hitting targetRounds as time for Long Break.
+                          // End of set -> Long Break (which finishes session after)
                           setPhase('LONG_BREAK');
                           return settings.longBreakTime * 60;
                       } else {
@@ -408,6 +413,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                   else if (phase === 'SHORT_BREAK') {
                       NativeService.Haptics.notificationSuccess();
                       setPhase('WORK');
+                      currentCycleElapsedRef.current = 0;
                       return settings.workTime * 60;
                   }
                   else if (phase === 'LONG_BREAK') {
@@ -424,12 +430,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   }, [sessionState, isPaused, phase, roundsCompleted, settings, mode, activeNotifications, targetRounds]);
 
   const handleShowSummary = (naturalFinish: boolean = false) => {
-      // If Stopwatch mode (manual stop), record actual elapsed time
-      if (mode === TimerMode.STOPWATCH) {
-          const elapsedMinutes = totalFocusedSecondsRef.current / 60;
-          if (elapsedMinutes > 0.05) { // Only record if > 3 seconds
-              recordCycleStats(elapsedMinutes);
-          }
+      // If Stopwatch mode (manual stop) or early stop, record what we have
+      if (mode === TimerMode.STOPWATCH || !naturalFinish) {
+           const elapsedMins = currentCycleElapsedRef.current / 60;
+           if (elapsedMins > 0.05) { // Only record if > 3 seconds
+               recordCycleStats(elapsedMins);
+           }
       }
 
       setDidFinishNaturally(naturalFinish);
@@ -453,6 +459,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const skipBreak = () => {
       if (phase === 'SHORT_BREAK') {
           setPhase('WORK');
+          currentCycleElapsedRef.current = 0;
           setTimeLeft(settings.workTime * 60);
           NativeService.Haptics.impactMedium();
       } else if (phase === 'LONG_BREAK') {
@@ -463,17 +470,37 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   // --- DEBUG TOOL ---
   const handleDebugFastForward = () => {
       if (phase === 'WORK') {
-          // Simulate adding 30 mins
-          totalFocusedSecondsRef.current += 1800; // +30m real stats
+          const SKIP_MINUTES = 30;
+          const SKIP_SECONDS = SKIP_MINUTES * 60;
           
+          // 1. Generate fake stats for the skipped time so chart isn't empty
+          recordCycleStats(SKIP_MINUTES);
+          
+          // 2. Add to global counters
+          totalFocusedSecondsRef.current += SKIP_SECONDS;
+          
+          // 3. Subtract from current countdown (or add if stopwatch)
           if (mode === TimerMode.POMODORO || mode === TimerMode.CUSTOM) {
-              // In Countdown, we must reduce timeLeft to near zero
-              setTimeLeft(5); 
+              if (timeLeft > SKIP_SECONDS) {
+                  // Skip 30m but continue session
+                  setTimeLeft(prev => prev - SKIP_SECONDS);
+                  // We don't add to currentCycleElapsedRef because we already recorded stats for it
+                  setNotificationMsg(`⚡ Debug: Skipped ${SKIP_MINUTES}m`);
+              } else {
+                  // Finish immediately (less than 30m left)
+                  // We treat the remainder as if it passed too
+                  const remainingMins = timeLeft / 60;
+                  recordCycleStats(remainingMins);
+                  totalFocusedSecondsRef.current += timeLeft;
+                  setTimeLeft(1); 
+                  setNotificationMsg("⚡ Debug: Finishing...");
+              }
           } else {
-              // In Stopwatch, we increase display time
-              setTimeLeft(prev => prev + 1800);
+              // Stopwatch: just add time
+              setTimeLeft(prev => prev + SKIP_SECONDS);
+              setNotificationMsg(`⚡ Debug: Added ${SKIP_MINUTES}m`);
           }
-          setNotificationMsg("⚡ Debug: +30m Skipped");
+          
           setTimeout(() => setNotificationMsg(null), 2000);
       }
   };
@@ -703,7 +730,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         <p className="text-gray-500">{t.focusedFor} <span className="text-green-600 font-bold">{
                             (() => {
                                 const m = totalFocusedSecondsRef.current / 60;
-                                return formatMinutes(Number(m.toFixed(1)));
+                                return formatMinutes(m);
                             })()
                         }</span>.</p>
                     </div>
@@ -761,7 +788,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                             </div>
                         </div>
 
-                        {/* 2. Timeline Chart */}
+                        {/* 2. Timeline Chart (UPDATED LAYOUT) */}
                         <div className="bg-white p-5 rounded-2xl shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="font-bold text-gray-800">{t.timeline}</h3>
@@ -773,36 +800,45 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                     No timeline data available.
                                 </div>
                             ) : (
-                                <div className="h-32 flex items-end justify-start gap-1 overflow-x-auto no-scrollbar pb-2">
-                                    {fullTimeline.map((seg, i) => (
-                                        <div key={i} className="flex-shrink-0 w-8 flex flex-col justify-end group relative h-full">
-                                            {/* Tooltip */}
-                                            <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                                                {seg.score}% ({formatMinutes(seg.duration)})
-                                            </div>
-                                            
-                                            {/* Bar */}
-                                            <motion.div 
-                                                initial={{ height: 0 }} animate={{ height: `${seg.score}%` }} transition={{ delay: i * 0.05 }}
-                                                className={`w-full rounded-t-md relative overflow-hidden
-                                                    ${seg.score > 80 ? 'bg-green-400' : seg.score > 60 ? 'bg-yellow-400' : 'bg-red-400'}
-                                                    ${seg.isPartial ? 'opacity-50' : ''}
-                                                `}
-                                            >
-                                                {/* Dashed overlay for partial blocks */}
-                                                {seg.isPartial && (
-                                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagonal-stripes.png')] opacity-20" />
-                                                )}
-                                            </motion.div>
-                                            
-                                            {/* Partial Marker */}
-                                            {seg.isPartial && (
-                                                <div className="absolute -bottom-4 w-full text-center text-[8px] text-gray-400 font-bold">
-                                                    {seg.duration}m
+                                <div className="relative">
+                                    {/* Scrollable Container with explicit X-axis overflow */}
+                                    <div className="h-32 flex items-end justify-start gap-1 overflow-x-auto no-scrollbar pb-6 w-full">
+                                        {fullTimeline.map((seg, i) => (
+                                            <div key={i} className="flex-shrink-0 w-8 flex flex-col justify-end group relative h-full min-w-[32px]">
+                                                {/* Tooltip */}
+                                                <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
+                                                    {seg.score}% ({formatMinutes(seg.duration)})
                                                 </div>
-                                            )}
+                                                
+                                                {/* Bar */}
+                                                <motion.div 
+                                                    initial={{ height: 0 }} animate={{ height: `${seg.score}%` }} transition={{ delay: i * 0.05 }}
+                                                    className={`w-full rounded-t-md relative overflow-hidden
+                                                        ${seg.score > 80 ? 'bg-green-400' : seg.score > 60 ? 'bg-yellow-400' : 'bg-red-400'}
+                                                        ${seg.isPartial ? 'opacity-50' : ''}
+                                                    `}
+                                                >
+                                                    {/* Dashed overlay for partial blocks */}
+                                                    {seg.isPartial && (
+                                                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagonal-stripes.png')] opacity-20" />
+                                                    )}
+                                                </motion.div>
+                                                
+                                                {/* X-Axis Label: Show every 30 mins (approx 6 blocks) */}
+                                                {(i % 6 === 0) && (
+                                                    <div className="absolute -bottom-6 left-0 text-[10px] text-gray-400 font-medium whitespace-nowrap">
+                                                        {formatMinutes(i * 5)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {/* Final Time Label */}
+                                        <div className="flex-shrink-0 w-1 h-1 relative">
+                                            <div className="absolute -bottom-6 left-0 text-[10px] text-gray-400 font-medium whitespace-nowrap">
+                                                 {formatMinutes(fullTimeline.length * 5)}
+                                            </div>
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
                             )}
                             <div className="border-t border-gray-100 mt-0 w-full" />
@@ -896,7 +932,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                 <button 
                     onClick={handleDebugFastForward}
                     className="absolute bottom-28 left-6 z-[60] bg-red-600/90 text-white w-12 h-12 rounded-full shadow-2xl border-2 border-white/20 flex items-center justify-center pointer-events-auto active:scale-95 transition-transform"
-                    title="Debug: Add 30 mins"
+                    title="Debug: Skip 30 mins"
                 >
                     <Bug size={24} />
                 </button>
