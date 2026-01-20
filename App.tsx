@@ -212,6 +212,7 @@ function App() {
           <FocusSessionView 
               mode={currentSessionParams.mode}
               initialTimeInSeconds={currentSessionParams.durationMinutes * 60}
+              settings={settings} // <--- PASSING SETTINGS HERE
               task={task}
               user={user}
               onComplete={handleSessionComplete}
