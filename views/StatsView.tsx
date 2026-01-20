@@ -100,8 +100,8 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings }) 
         >
             <div className="flex justify-between items-start mb-4">
                 <div>
-                    <h3 className="text-indigo-100 font-semibold mb-1 text-sm">Your Companion</h3>
-                    <h2 className="text-2xl font-bold">Focus Fox</h2>
+                    <h3 className="text-indigo-100 font-semibold mb-1 text-sm">{t.companion}</h3>
+                    <h2 className="text-2xl font-bold">{t.petName}</h2>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
                     {isPetExpanded ? <ChevronUp className="text-white" size={20} /> : <ChevronDown className="text-white" size={20} />}
@@ -112,14 +112,14 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings }) 
                 <div className="text-6xl animate-bounce filter drop-shadow-lg">🦊</div>
                 <div className="flex-1">
                     <div className="flex justify-between items-end mb-1.5">
-                        <div className="text-xs text-indigo-100 font-bold tracking-wider">HAPPINESS</div>
-                        <div className="text-xs text-indigo-100 font-mono opacity-80">Lv. 3</div>
+                        <div className="text-xs text-indigo-100 font-bold tracking-wider">{t.happiness}</div>
+                        <div className="text-xs text-indigo-100 font-mono opacity-80">{t.level} 3</div>
                     </div>
                     <div className="w-full h-2.5 bg-black/20 rounded-full overflow-hidden backdrop-blur-sm">
                         <div className="bg-yellow-400 w-[80%] h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
                     </div>
                     <p className="text-xs text-indigo-100 mt-2 opacity-90">
-                        {isPetExpanded ? "Tap to collapse" : "Focus more to feed!"}
+                        {isPetExpanded ? t.tapCollapse : t.tapExpand}
                     </p>
                 </div>
             </div>
@@ -138,22 +138,22 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings }) 
                              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex flex-col items-center justify-center text-center">
                                 <Brain size={20} className="text-pink-300 mb-1" />
                                 <span className="text-lg font-bold">65%</span>
-                                <span className="text-[10px] text-indigo-100">Deep Focus</span>
+                                <span className="text-[10px] text-indigo-100">{t.deepFocus}</span>
                              </div>
                              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex flex-col items-center justify-center text-center">
                                 <Coffee size={20} className="text-yellow-300 mb-1" />
                                 <span className="text-lg font-bold">20%</span>
-                                <span className="text-[10px] text-indigo-100">Focused</span>
+                                <span className="text-[10px] text-indigo-100">{t.focused}</span>
                              </div>
                              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex flex-col items-center justify-center text-center">
                                 <Zap size={20} className="text-blue-300 mb-1" />
                                 <span className="text-lg font-bold">10%</span>
-                                <span className="text-[10px] text-indigo-100">Zoning Out</span>
+                                <span className="text-[10px] text-indigo-100">{t.zoningOut}</span>
                              </div>
                              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex flex-col items-center justify-center text-center">
                                 <Frown size={20} className="text-red-300 mb-1" />
                                 <span className="text-lg font-bold">5%</span>
-                                <span className="text-[10px] text-indigo-100">Distracted</span>
+                                <span className="text-[10px] text-indigo-100">{t.distracted}</span>
                              </div>
                         </div>
                     </motion.div>

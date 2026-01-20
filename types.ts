@@ -30,12 +30,14 @@ export interface Task {
   note?: string;
 }
 
+export type LanguageCode = 'en' | 'zh' | 'zh-TW' | 'fr' | 'ja' | 'ko' | 'es' | 'ru' | 'ar' | 'de' | 'hi';
+
 export interface Settings {
   workTime: number;
   shortBreakTime: number;
   longBreakTime: number;
   pomodorosPerRound: number;
-  language: 'en' | 'zh'; // New field
+  language: LanguageCode; 
 }
 
 export interface FocusRecord {

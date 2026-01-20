@@ -77,6 +77,22 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   const [browsingTaskIndex, setBrowsingTaskIndex] = useState(0); 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
+  // Translation Map for Segmented Control
+  const modeLabels = useMemo(() => {
+      return {
+          [TimerMode.POMODORO]: t.mode_pomodoro,
+          [TimerMode.STOPWATCH]: t.mode_stopwatch,
+          [TimerMode.CUSTOM]: t.mode_custom,
+      };
+  }, [t]);
+
+  const segmentedOptions = Object.values(modeLabels);
+
+  // Helper to get TimerMode from label
+  const getModeFromLabel = (label: string): TimerMode => {
+      return Object.keys(modeLabels).find(key => modeLabels[key as TimerMode] === label) as TimerMode;
+  };
+
   // Auto-select logic
   useEffect(() => {
       if (sortedTasks.length === 0) return;
@@ -213,13 +229,14 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             <div className="flex items-center gap-3 w-full max-w-md mb-6">
                 <div className="flex-1">
                     <IOSSegmentedControl 
-                        options={['Pomodoro', 'Stopwatch', 'Custom']} 
-                        selected={mode === TimerMode.POMODORO ? 'Pomodoro' : mode === TimerMode.STOPWATCH ? 'Stopwatch' : 'Custom'}
+                        options={segmentedOptions} 
+                        selected={modeLabels[mode]}
                         onChange={(val) => {
-                            if(val === 'Pomodoro') setMode(TimerMode.POMODORO);
-                            else if (val === 'Stopwatch') setMode(TimerMode.STOPWATCH);
-                            else setMode(TimerMode.CUSTOM);
-                            setIsQuickSettingsOpen(false); // Close settings on mode switch
+                            const newMode = getModeFromLabel(val);
+                            if (newMode) {
+                                setMode(newMode);
+                                setIsQuickSettingsOpen(false); 
+                            }
                         }} 
                     />
                 </div>
@@ -435,7 +452,6 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                        </div>
                                    </div>
                                    <div className="flex flex-col items-start">
-                                       {/* FIXED: Was "PROMOS", now localized */}
                                        <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
                                        <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
                                             <Zap size={14} className="text-yellow-500"/>

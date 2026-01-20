@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton } from '../components/IOSComponents';
-import { Settings, User, Product } from '../types';
+import { Settings, User, Product, LanguageCode } from '../types';
 import { SAAS_CONFIG } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
-import { translations } from '../utils/translations';
+import { translations, LANGUAGE_NAMES } from '../utils/translations';
 
 // --- Reusable Row Components ---
 interface SettingRowProps {
@@ -80,8 +80,11 @@ interface SettingsViewProps {
 
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user, onLogin, onLogout, onUpgrade }) => {
   const t = translations[settings.language].settings;
+  const tPremium = translations[settings.language].premium;
+  
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   // Default to selecting the first plan (usually monthly or the recommended one)
   // We'll find the one tagged 'BEST VALUE' or default to index 0
@@ -89,6 +92,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
   const [selectedPlanId, setSelectedPlanId] = useState<string>(defaultPlanId);
 
   const selectedPlan = SAAS_CONFIG.plans.find(p => p.id === selectedPlanId);
+
+  // Helper to get translated plan details
+  const getPlanDetails = (planId: string) => {
+      if (planId.includes('monthly')) return { name: tPremium.monthly_name, desc: tPremium.monthly_desc, tag: null };
+      if (planId.includes('yearly')) return { name: tPremium.yearly_name, desc: tPremium.yearly_desc, tag: tPremium.yearly_tag };
+      if (planId.includes('lifetime')) return { name: tPremium.lifetime_name, desc: tPremium.lifetime_desc, tag: tPremium.lifetime_tag };
+      return { name: 'Unknown', desc: '', tag: null };
+  };
 
   const handlePerformLogin = (provider: 'apple' | 'google') => {
       onLogin(provider);
@@ -157,8 +168,55 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
       </motion.div>
   );
 
+  // --- Language Selection Modal ---
+  const LanguageModal = () => (
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={() => setShowLanguageModal(false)}
+      >
+          <motion.div 
+            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+            className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl max-h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-900">{t.language}</h3>
+                  <button onClick={() => setShowLanguageModal(false)} className="text-gray-400 p-1"><X size={20}/></button>
+              </div>
+              <div className="overflow-y-auto p-2">
+                  {Object.keys(LANGUAGE_NAMES).map((code) => (
+                      <button 
+                        key={code}
+                        onClick={() => {
+                            setSettings({...settings, language: code as LanguageCode});
+                            setShowLanguageModal(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-colors
+                            ${settings.language === code ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50 text-gray-700'}
+                        `}
+                      >
+                          <span className="font-medium">{LANGUAGE_NAMES[code as LanguageCode]}</span>
+                          {settings.language === code && <Check size={16} />}
+                      </button>
+                  ))}
+              </div>
+          </motion.div>
+      </motion.div>
+  );
+
   // --- Premium Modal ---
-  const PremiumModal = () => (
+  const PremiumModal = () => {
+    // Dynamic feature list using translations
+    const features = [
+        tPremium.feat_sync,
+        tPremium.feat_history,
+        tPremium.feat_skins,
+        tPremium.feat_noise,
+        tPremium.feat_support
+    ];
+
+    return (
     <motion.div 
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
@@ -185,7 +243,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
             <div className="flex-1 overflow-y-auto px-6 pt-6 pb-2">
                 {/* Feature List */}
                 <div className="space-y-3 mb-6">
-                    {SAAS_CONFIG.features.map((feat, i) => (
+                    {features.map((feat, i) => (
                         <div key={i} className="flex items-center gap-3">
                             <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                                 <Check size={12} className="text-indigo-600 font-bold" strokeWidth={3} />
@@ -195,12 +253,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                     ))}
                 </div>
 
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Choose a Plan</div>
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t.choosePlan}</div>
 
                 {/* Plan Selection */}
                 <div className="space-y-3 mb-6">
                     {SAAS_CONFIG.plans.map((plan) => {
                         const isSelected = selectedPlanId === plan.id;
+                        const details = getPlanDetails(plan.id);
                         return (
                             <div 
                                 key={plan.id}
@@ -209,17 +268,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                                     ${isSelected ? 'border-indigo-500 shadow-md ring-1 ring-indigo-500 bg-indigo-50/10' : 'border-transparent shadow-sm hover:bg-gray-50'}
                                 `}
                             >
-                                {plan.tag && (
+                                {details.tag && (
                                     <div className="absolute -top-2.5 right-4 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-                                        {plan.tag}
+                                        {details.tag}
                                     </div>
                                 )}
                                 
                                 <div>
                                      <div className="flex items-center gap-2">
-                                         <h3 className={`font-bold ${isSelected ? 'text-indigo-700' : 'text-gray-900'}`}>{plan.name}</h3>
+                                         <h3 className={`font-bold ${isSelected ? 'text-indigo-700' : 'text-gray-900'}`}>{details.name}</h3>
                                      </div>
-                                     <div className="text-sm text-gray-500 mt-0.5">{plan.description}</div>
+                                     <div className="text-sm text-gray-500 mt-0.5">{details.desc}</div>
                                 </div>
 
                                 <div className="text-right">
@@ -244,14 +303,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                     <div className="flex items-center justify-center gap-2">
                         <Apple size={20} fill="white" /> 
                         <span>
-                            Subscribe for {selectedPlan?.price}
-                            {selectedPlan?.interval !== 'lifetime' && <span className="text-sm opacity-80 font-normal ml-1">/{selectedPlan?.interval}</span>}
+                            {t.subscribe} {selectedPlan?.price}
                         </span>
                     </div>
                 </IOSButton>
 
                 <p className="text-[10px] text-gray-400 text-center leading-tight">
-                    Recurring billing, cancel anytime. By continuing you agree to our Terms of Service and Privacy Policy.
+                    {t.recurring}
                 </p>
                 <button onClick={handleRestorePurchases} className="w-full mt-3 py-1 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors">
                     {t.restore}
@@ -259,7 +317,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
             </div>
         </motion.div>
     </motion.div>
-  );
+    );
+  };
 
   return (
     <div className="pt-8 pb-32 px-6 h-full overflow-y-auto no-scrollbar relative">
@@ -385,10 +444,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
        <IOSCard className="px-4 py-1">
             <SettingRow 
                 icon={Languages} 
-                label="English / 中文" 
-                value={settings.language === 'en' ? 'English' : '中文'} 
+                label={t.language} 
+                value={LANGUAGE_NAMES[settings.language]} 
                 color="bg-purple-500" 
-                onClick={() => setSettings({...settings, language: settings.language === 'en' ? 'zh' : 'en'})}
+                onClick={() => setShowLanguageModal(true)}
             />
        </IOSCard>
 
@@ -407,6 +466,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
        <AnimatePresence>
            {showLoginModal && <LoginModal />}
            {showPremiumModal && <PremiumModal />}
+           {showLanguageModal && <LanguageModal />}
        </AnimatePresence>
     </div>
   );
