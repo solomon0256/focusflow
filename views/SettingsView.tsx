@@ -578,12 +578,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           />
        </IOSCard>
 
-       {/* POWER SAVING SETTINGS */}
-       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">Performance</h2>
+       {/* POWER SAVING SETTINGS - NOW LOCALIZED */}
+       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">{t.performance}</h2>
        <IOSCard className="px-4 py-1">
             <SettingRow 
                 icon={Battery} 
-                label="Power Saver" 
+                label={t.powerSaver} 
                 value={settings.batterySaverMode} 
                 type="toggle"
                 color="bg-green-500" 
@@ -592,7 +592,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
             {settings.batterySaverMode && (
                 <div className="pb-3 px-1">
                      <p className="text-[10px] text-gray-400 leading-tight">
-                         Reduces AI detection to 2 FPS. Keeps camera active but saves battery during long sessions.
+                         {t.powerSaverDesc}
                      </p>
                 </div>
             )}
