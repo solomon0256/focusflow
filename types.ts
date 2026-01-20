@@ -50,6 +50,15 @@ export interface FocusRecord {
     mode: TimerMode;
 }
 
+// --- PET SYSTEM TYPES ---
+export interface PetState {
+    level: number;
+    currentExp: number;
+    maxExp: number;
+    happiness: number;
+    lastDailyActivityDate: string; // YYYY-MM-DD
+}
+
 export interface User {
     id: string;
     name: string;
@@ -57,6 +66,7 @@ export interface User {
     avatar?: string;
     isPremium: boolean;
     planExpiry?: string;
+    pet: PetState; // Added Pet State
 }
 
 // --- NEW SAAS TYPES ---

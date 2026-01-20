@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock } from 'lucide-react';
+import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug } from 'lucide-react';
 import { TimerMode, Task, User, Settings } from '../types';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
 import { NativeService } from '../services/native';
@@ -73,6 +73,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const [timeLeft, setTimeLeft] = useState(initialTimeInSeconds);
   const [isPaused, setIsPaused] = useState(false);
   
+  // Notification Toast State
+  const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
+
   // Stats Accumulator
   const totalFocusedSecondsRef = useRef(0);
   const sessionHistoryRef = useRef<SessionSegmentLog[]>([]);
@@ -118,6 +121,15 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   // Real-time State
   const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
   const [focusScore, setFocusScore] = useState(100); 
+
+  // --- Notification Data Preparation ---
+  // Get the correct list of notifications based on current mode
+  const activeNotifications = useMemo(() => {
+      if (mode === TimerMode.POMODORO) return settings.notifications || [];
+      if (mode === TimerMode.CUSTOM) return settings.customNotifications || [];
+      if (mode === TimerMode.STOPWATCH) return settings.stopwatchNotifications || [];
+      return [];
+  }, [mode, settings]);
 
   // 0. Wake Lock
   useEffect(() => {
@@ -314,7 +326,22 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const interval = setInterval(() => {
           setTimeLeft((prev) => {
               if (phase === 'WORK') {
+                  // Increment Total Elapsed Seconds
                   totalFocusedSecondsRef.current += 1;
+                  
+                  // --- NOTIFICATION TRIGGER LOGIC (ELAPSED TIME) ---
+                  const elapsedSeconds = totalFocusedSecondsRef.current;
+                  // Check if we hit a minute mark exactly (e.g., 300s, 600s)
+                  if (elapsedSeconds % 60 === 0) {
+                      const elapsedMinutes = elapsedSeconds / 60;
+                      if (activeNotifications.includes(elapsedMinutes)) {
+                          // TRIGGER!
+                          NativeService.Haptics.notificationSuccess();
+                          setNotificationMsg(`${elapsedMinutes} minutes reached`);
+                          // Auto-hide toast after 3s
+                          setTimeout(() => setNotificationMsg(null), 3000);
+                      }
+                  }
               }
 
               // STOPWATCH: Count UP
@@ -360,7 +387,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           });
       }, 1000);
       return () => clearInterval(interval);
-  }, [sessionState, isPaused, phase, roundsCompleted, settings, mode]);
+  }, [sessionState, isPaused, phase, roundsCompleted, settings, mode, activeNotifications]);
 
   const handleShowSummary = () => {
       // If Stopwatch mode (manual stop), record actual elapsed time
@@ -387,6 +414,24 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           NativeService.Haptics.impactMedium();
       } else if (phase === 'LONG_BREAK') {
           handleShowSummary();
+      }
+  };
+
+  // --- DEBUG TOOL ---
+  const handleDebugFastForward = () => {
+      if (phase === 'WORK') {
+          // Simulate adding 30 mins
+          totalFocusedSecondsRef.current += 1800; // +30m real stats
+          
+          if (mode === TimerMode.POMODORO || mode === TimerMode.CUSTOM) {
+              // In Countdown, we must reduce timeLeft to near zero
+              setTimeLeft(5); 
+          } else {
+              // In Stopwatch, we increase display time
+              setTimeLeft(prev => prev + 1800);
+          }
+          setNotificationMsg("⚡ Debug: +30m Skipped");
+          setTimeout(() => setNotificationMsg(null), 2000);
       }
   };
 
@@ -788,7 +833,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         )}
                     </div>
 
-                    <div className="relative flex flex-col items-center justify-center">
+                    <div className="relative flex flex-col items-center justify-center gap-4">
                         <svg className="w-14 h-14 transform -rotate-90">
                             <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-gray-800" />
                             <circle 
@@ -805,15 +850,38 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                              focusState === 'DISTRACTED' ? <AlertTriangle size={20} className="text-red-500" /> :
                              <UserIcon size={20} className="text-green-400" />}
                         </div>
+                        
+                        {/* DEBUG BUTTON */}
+                        <button 
+                            onClick={handleDebugFastForward}
+                            className="absolute top-0 right-[-60px] bg-red-500/80 hover:bg-red-600/90 text-white p-2 rounded-full shadow-lg backdrop-blur-sm pointer-events-auto flex items-center justify-center active:scale-95 transition-transform"
+                            title="Debug: Add 30 mins"
+                        >
+                            <Bug size={16} />
+                        </button>
                     </div>
                 </div>
 
                 {/* Middle: Timer & Alerts */}
                 <div className="relative flex flex-col items-center justify-center drop-shadow-2xl">
-                    <div className="h-8 mb-4">
-                        <AnimatePresence>
-                            {(!isAiDisabled) && focusState === 'DISTRACTED' && (
+                    <div className="h-10 mb-4 flex flex-col items-center">
+                        <AnimatePresence mode="wait">
+                            {/* Notification Toast */}
+                            {notificationMsg && (
                                 <motion.div 
+                                    key="toast"
+                                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                                    className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 shadow-lg border border-white/10"
+                                >
+                                    <Bell size={14} className="text-white" />
+                                    <span className="font-bold text-sm tracking-wide text-white">{notificationMsg}</span>
+                                </motion.div>
+                            )}
+
+                            {/* AI Focus States */}
+                            {!notificationMsg && (!isAiDisabled) && focusState === 'DISTRACTED' && (
+                                <motion.div 
+                                    key="distracted"
                                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
                                     className="bg-red-500/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-red-900/50"
                                 >
@@ -821,8 +889,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                     <span className="font-bold text-xs tracking-wide">STAY FOCUSED</span>
                                 </motion.div>
                             )}
-                            {(!isAiDisabled) && focusState === 'DEEP_FLOW' && (
+                            {!notificationMsg && (!isAiDisabled) && focusState === 'DEEP_FLOW' && (
                                 <motion.div 
+                                    key="flow"
                                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
                                     className="bg-indigo-500/80 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-indigo-900/50"
                                 >

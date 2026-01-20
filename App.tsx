@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
@@ -54,7 +53,34 @@ function App() {
         try {
             // Load User
             const savedUser = await NativeService.Storage.get<User>(STORAGE_KEYS.USER);
-            if (savedUser) setUser(savedUser);
+            if (savedUser) {
+                // Migration: Add Pet State if missing
+                if (!savedUser.pet) {
+                    savedUser.pet = {
+                        level: 1,
+                        currentExp: 0,
+                        maxExp: 100,
+                        happiness: 100,
+                        lastDailyActivityDate: ''
+                    };
+                }
+                setUser(savedUser);
+            } else {
+                // Initialize default user with pet
+                setUser({
+                    id: 'guest_' + Date.now(),
+                    name: 'Guest',
+                    email: '',
+                    isPremium: false,
+                    pet: {
+                        level: 1,
+                        currentExp: 0,
+                        maxExp: 100,
+                        happiness: 100,
+                        lastDailyActivityDate: ''
+                    }
+                });
+            }
 
             // Load Settings
             const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
@@ -148,12 +174,22 @@ function App() {
   const handleLogin = (provider: 'apple' | 'google') => {
       NativeService.Haptics.impactMedium();
       setTimeout(() => {
-        setUser({
+        // Mock login
+        const newUserState: User = {
             id: 'u_12345',
             name: provider === 'apple' ? 'Apple User' : 'Google User',
             email: provider === 'apple' ? 'user@icloud.com' : 'user@gmail.com',
             isPremium: false,
-        });
+            // Preserve pet state if existed
+            pet: user?.pet || {
+                level: 1,
+                currentExp: 0,
+                maxExp: 100,
+                happiness: 100,
+                lastDailyActivityDate: ''
+            }
+        };
+        setUser(newUserState);
         NativeService.Haptics.notificationSuccess();
       }, 800);
   };
@@ -177,9 +213,7 @@ function App() {
       setIsFocusSessionActive(false);
       setCurrentSessionParams(null);
       setActiveTab('settings');
-      // In a real app, we might pass a state to SettingsView to auto-open the modal
       setTimeout(() => {
-          // This is a bit of a hack for the prototype, in real Redux/Context app we'd dispatch an action
           alert("Please click 'View Offer' in Settings to upgrade!");
       }, 300);
   };
@@ -193,6 +227,42 @@ function App() {
   const handleSessionComplete = (minutes: number) => {
       if (currentSessionParams) {
           addFocusRecord(minutes, currentSessionParams.mode);
+          
+          // --- PET SYSTEM: ADD EXP ---
+          // Rule: If focus duration > 0.1 hours (approx 5-6 mins) AND haven't claimed today, add +5 EXP.
+          if (user && minutes >= 5) {
+              const todayStr = new Date().toISOString().split('T')[0];
+              const alreadyClaimedToday = user.pet.lastDailyActivityDate === todayStr;
+              
+              if (!alreadyClaimedToday) {
+                  const gainedExp = 5;
+                  let newExp = user.pet.currentExp + gainedExp;
+                  let newLevel = user.pet.level;
+                  let newMaxExp = user.pet.maxExp;
+
+                  // Simple Level Up Logic
+                  if (newExp >= user.pet.maxExp) {
+                      newLevel += 1;
+                      newExp = newExp - user.pet.maxExp;
+                      newMaxExp = Math.floor(100 * Math.pow(1.5, newLevel - 1));
+                      // Could trigger Level Up Modal here
+                  }
+
+                  const updatedUser = {
+                      ...user,
+                      pet: {
+                          ...user.pet,
+                          level: newLevel,
+                          currentExp: newExp,
+                          maxExp: newMaxExp,
+                          lastDailyActivityDate: todayStr,
+                          happiness: Math.min(100, user.pet.happiness + 10)
+                      }
+                  };
+                  setUser(updatedUser);
+                  // Optional: Show toast via NativeService or local state in next render
+              }
+          }
       }
       setIsFocusSessionActive(false);
       setCurrentSessionParams(null);
