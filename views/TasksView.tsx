@@ -14,6 +14,15 @@ interface TasksViewProps {
   toggleTask: (id: string) => void;
 }
 
+// Helper to format minutes
+const formatMinutes = (m: number) => {
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    if (min === 0) return `${h}h`;
+    return `${h}h ${min}m`;
+};
+
 const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateTask, deleteTask, toggleTask }) => {
   const t = translations[settings.language].tasks;
 
@@ -335,7 +344,9 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                             {task.time && <span className="text-xs font-mono font-medium text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">{task.time}</span>}
                                             <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${getPriorityColor(task.priority)}`}>{task.priority}</span>
                                             <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded"><Zap size={10} className="fill-gray-400 text-gray-400" /> {task.pomodoroCount}</span>
-                                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded"><Clock size={10} /> {task.durationMinutes}m</span>
+                                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                <Clock size={10} /> {formatMinutes(task.durationMinutes)}
+                                            </span>
                                         </div>
                                         {task.note && <p className="text-xs text-gray-400 mt-2 line-clamp-1">{task.note}</p>}
                                     </div>
@@ -525,7 +536,9 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                         <div className="bg-white p-4 rounded-xl shadow-sm">
                              <div className="flex justify-between items-center mb-4">
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">{t.estDuration}</label>
-                                <span className="text-blue-600 font-bold font-mono">{formDuration} min</span>
+                                <span className="text-blue-600 font-bold font-mono">
+                                    {formatMinutes(formDuration)}
+                                </span>
                              </div>
                              <input 
                                 type="range" 

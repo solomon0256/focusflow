@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface AdBannerProps {
     onRemoveAds: () => void;
@@ -7,7 +7,7 @@ interface AdBannerProps {
 
 export const AdBanner: React.FC<AdBannerProps> = ({ onRemoveAds }) => {
     return (
-        <div className="mx-4 mt-auto mb-safe bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 flex items-center justify-between relative overflow-hidden group">
+        <div className="mx-4 mt-auto mb-safe bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 flex items-center justify-between relative overflow-hidden group cursor-pointer" onClick={onRemoveAds}>
             {/* Shimmer Effect */}
             <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
             
@@ -23,12 +23,11 @@ export const AdBanner: React.FC<AdBannerProps> = ({ onRemoveAds }) => {
 
             <div className="flex items-center gap-2">
                 <button 
-                    onClick={onRemoveAds}
                     className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform"
                 >
                     Remove Ads
                 </button>
-                <button className="text-white/50 hover:text-white">
+                <button className="text-white/50 hover:text-white" onClick={(e) => { e.stopPropagation(); /* In real app, close ad */ }}>
                     <X size={14} />
                 </button>
             </div>

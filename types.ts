@@ -37,6 +37,9 @@ export interface Settings {
   shortBreakTime: number;
   longBreakTime: number;
   pomodorosPerRound: number;
+  notifications: number[]; // Used for POMODORO mode
+  customNotifications: number[]; // Used for CUSTOM mode
+  stopwatchNotifications: number[]; // Used for STOPWATCH mode
   language: LanguageCode; 
 }
 

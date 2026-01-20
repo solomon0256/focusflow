@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw, Plus, Bell } from 'lucide-react';
 import { TimerMode, Task, Settings, Priority } from '../types';
 import { IOSSegmentedControl } from '../components/IOSComponents';
+import { IOSWheelPicker } from '../components/IOSWheelPicker';
 import { translations } from '../utils/translations';
 
 interface TimerViewProps {
@@ -12,6 +13,15 @@ interface TimerViewProps {
   onRecordTime: (minutes: number, mode: TimerMode) => void;
   onStartSession: (duration: number, mode: TimerMode, taskId?: string) => void;
 }
+
+// Helper to format minutes into "1h 30m" or "45m"
+const formatMinutes = (m: number) => {
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    if (min === 0) return `${h}h`;
+    return `${h}h ${min}m`;
+};
 
 // Helper to calculate total cycle time
 const calculateTotalDuration = (workTime: number, shortBreak: number, longBreak: number, rounds: number) => {
@@ -41,7 +51,10 @@ const QuickSlider = ({ label, value, onChange, max, colorClass, unit = 'm' }: { 
     <div>
         <div className="flex justify-between items-center mb-1.5">
             <span className="text-sm font-medium text-gray-700">{label}</span>
-            <span className={`text-sm font-bold font-mono ${colorClass}`}>{value}{unit}</span>
+            <span className={`text-sm font-bold font-mono ${colorClass}`}>
+                {/* Use smart formatting if unit is 'm' (minutes), otherwise default behavior */}
+                {unit === 'm' ? formatMinutes(value) : `${value}${unit}`}
+            </span>
         </div>
         <input 
             type="range" 
@@ -72,6 +85,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   
   const [mode, setMode] = useState<TimerMode>(TimerMode.POMODORO);
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
+  
+  // Notification Picker State
+  const [isNotificationPickerOpen, setIsNotificationPickerOpen] = useState(false);
+  const [pickerValue, setPickerValue] = useState("5m"); // Default with unit
   
   // Task selection state
   const [browsingTaskIndex, setBrowsingTaskIndex] = useState(0); 
@@ -127,10 +144,24 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
     if (selectedTaskId) {
         const task = tasks.find(t => t.id === selectedTaskId);
         if (task && mode === TimerMode.CUSTOM) {
-            setCustomDuration(task.durationMinutes);
+            const newDuration = task.durationMinutes;
+            setCustomDuration(newDuration);
+            
+            // FIX: Auto-trim custom notifications when task selection updates duration
+            setSettings(prev => {
+                const validList = prev.customNotifications.filter(n => n < newDuration);
+                // Only update if changes are needed
+                if (validList.length !== prev.customNotifications.length) {
+                    return {
+                        ...prev,
+                        customNotifications: validList
+                    };
+                }
+                return prev;
+            });
         }
     }
-  }, [selectedTaskId, mode, tasks]);
+  }, [selectedTaskId, mode, tasks, setSettings]);
 
   const timelineSegments = useMemo(() => {
     const segments = [];
@@ -166,8 +197,66 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
           workTime: 25,
           shortBreakTime: 5,
           longBreakTime: 15,
-          pomodorosPerRound: 4
+          pomodorosPerRound: 4,
+          notifications: []
       }));
+  };
+
+  const handleWorkTimeChange = (v: number) => {
+      // Filter out notifications that are longer than the new work time for Pomodoro
+      const validNotifications = settings.notifications.filter(n => n < v);
+      setSettings(prev => ({...prev, workTime: v, notifications: validNotifications}));
+  };
+
+  // --- DATA SEPARATION HELPERS ---
+  const getCurrentNotifications = () => {
+      if (mode === TimerMode.POMODORO) return settings.notifications || [];
+      if (mode === TimerMode.CUSTOM) return settings.customNotifications || [];
+      if (mode === TimerMode.STOPWATCH) return settings.stopwatchNotifications || [];
+      return [];
+  };
+
+  const handleAddNotification = () => {
+      // Parse logic: "1h 5m" -> 65
+      let val = 0;
+      if (pickerValue.includes('h')) {
+          const parts = pickerValue.split('h');
+          const h = parseInt(parts[0]);
+          const m = parts[1] && parts[1].includes('m') ? parseInt(parts[1]) : 0;
+          val = h * 60 + m;
+      } else {
+          val = parseInt(pickerValue);
+      }
+
+      const currentList = getCurrentNotifications();
+      // Limits based on mode
+      const maxTime = mode === TimerMode.STOPWATCH ? 240 : (mode === TimerMode.CUSTOM ? customDuration : settings.workTime);
+
+      if (!isNaN(val) && val > 0 && val < maxTime && !currentList.includes(val)) {
+          const newList = [...currentList, val].sort((a, b) => a - b);
+          
+          setSettings(prev => {
+              const next = { ...prev };
+              if (mode === TimerMode.POMODORO) next.notifications = newList;
+              else if (mode === TimerMode.CUSTOM) next.customNotifications = newList;
+              else if (mode === TimerMode.STOPWATCH) next.stopwatchNotifications = newList;
+              return next;
+          });
+      }
+      setIsNotificationPickerOpen(false);
+  };
+
+  const handleRemoveNotification = (val: number) => {
+      const currentList = getCurrentNotifications();
+      const newList = currentList.filter(n => n !== val);
+      
+      setSettings(prev => {
+          const next = { ...prev };
+          if (mode === TimerMode.POMODORO) next.notifications = newList;
+          else if (mode === TimerMode.CUSTOM) next.customNotifications = newList;
+          else if (mode === TimerMode.STOPWATCH) next.stopwatchNotifications = newList;
+          return next;
+      });
   };
 
   const getPriorityColor = (p: Priority) => {
@@ -191,8 +280,14 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
 
   const formatTime = (totalSeconds: number) => {
     if (totalSeconds < 0) totalSeconds = 0;
-    const m = Math.floor(totalSeconds / 60);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
+    
+    // Show Hours if > 0
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -211,6 +306,63 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   };
 
   const currentTask = sortedTasks[browsingTaskIndex];
+
+  // Generate picker items based on current work time or mode
+  const notificationPickerItems = useMemo(() => {
+      const items = [];
+      const max = mode === TimerMode.STOPWATCH ? 240 : (mode === TimerMode.CUSTOM ? customDuration : settings.workTime);
+      for (let i = 1; i < max; i++) {
+          // Push formatted strings (e.g. "65m" -> "1h 5m")
+          items.push(formatMinutes(i));
+      }
+      return items;
+  }, [settings.workTime, mode, customDuration]);
+
+  // Reusable Notification Panel Component
+  const NotificationPanel = () => {
+      const activeNotifications = getCurrentNotifications();
+      
+      return (
+        <div className="bg-gray-50/50 p-3 rounded-xl border border-gray-100 mt-4">
+            <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1.5">
+                    <Bell size={12} className="text-gray-500" />
+                    <span className="text-xs font-bold text-gray-500 uppercase">{tSettings.notifications}</span>
+                </div>
+                <span className="text-[10px] font-bold text-gray-400">{activeNotifications.length}/10</span>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+                {activeNotifications.sort((a,b) => a-b).map(n => (
+                    <button 
+                        key={n}
+                        onClick={() => handleRemoveNotification(n)}
+                        className="flex items-center gap-1 bg-white border border-gray-200 px-2 py-1 rounded-md text-xs font-semibold text-gray-600 shadow-sm active:scale-95 transition-transform"
+                    >
+                        {formatMinutes(n)}
+                        <X size={10} className="text-gray-400" />
+                    </button>
+                ))}
+                
+                {activeNotifications.length < 10 && (
+                    <button 
+                        onClick={() => {
+                            if (notificationPickerItems.length > 0) {
+                                // Default pick the first one available
+                                setPickerValue(notificationPickerItems[0]);
+                                setIsNotificationPickerOpen(true);
+                            }
+                        }}
+                        className="flex items-center gap-1 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md text-xs font-bold text-blue-500 active:scale-95 transition-transform"
+                    >
+                        <Plus size={10} strokeWidth={3} />
+                        {tSettings.addNotification}
+                    </button>
+                )}
+            </div>
+        </div>
+      );
+  };
 
   return (
     <div className="h-full pt-safe-top pb-24 px-6 bg-[#f2f2f7] relative overflow-y-auto no-scrollbar w-full">
@@ -240,12 +392,12 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         }} 
                     />
                 </div>
-                {/* Quick Action Button (Settings Toggle) */}
+                {/* Quick Action Button (Settings Toggle) - ONLY for Pomodoro now */}
                 <button 
                     onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
                     className={`w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-md active:scale-95 transition-transform duration-200
                         ${isQuickSettingsOpen ? 'bg-gray-500' : 'bg-blue-500'}
-                        ${mode !== TimerMode.POMODORO ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+                        ${mode !== TimerMode.POMODORO ? 'hidden' : ''}
                     `}
                 >
                     {isQuickSettingsOpen ? <X size={18} /> : <SlidersHorizontal size={18} />}
@@ -273,11 +425,11 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         exit={{ opacity: 0 }}
                         className="w-full"
                     >
-                        {/* Timeline Area - Always Visible */}
+                        {/* Timeline Area */}
                         <div className="w-full">
                             <div className="flex justify-between text-xs text-gray-500 mb-2 px-1 font-bold uppercase tracking-widest">
                                 <span>{t.estCycle}</span>
-                                <span>{Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60)}m</span>
+                                <span>{formatMinutes(Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60))}</span>
                             </div>
                             
                             <div className="h-12 w-full bg-white/90 backdrop-blur-md rounded-2xl p-2 shadow-sm flex gap-1.5 relative overflow-hidden border-2 border-blue-200 transition-all">
@@ -302,12 +454,12 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                             </div>
                             
                             <div className="flex justify-between mt-1 text-[10px] text-blue-400 font-bold px-1">
-                                <span>{t.focusTime}: {settings.workTime}m</span>
-                                <span>{t.break}: {settings.shortBreakTime}m</span>
+                                <span>{t.focusTime}: {formatMinutes(settings.workTime)}</span>
+                                <span>{t.break}: {formatMinutes(settings.shortBreakTime)}</span>
                             </div>
                         </div>
 
-                        {/* Collapsible Settings Panel (Expands Below) */}
+                        {/* Collapsible Settings Panel */}
                         <AnimatePresence>
                             {isQuickSettingsOpen && (
                                 <motion.div
@@ -319,20 +471,18 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                      <div className="bg-white/80 backdrop-blur-xl p-5 rounded-3xl shadow-sm border border-white/50 w-full">
                                          <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
                                             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{tSettings.timerConfig}</span>
-                                            <button 
-                                                onClick={handleReset}
-                                                className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md active:scale-95 transition-transform"
-                                            >
-                                                <RotateCcw size={10} />
-                                                {tSettings.reset.toUpperCase()}
+                                            <button onClick={handleReset} className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md active:scale-95 transition-transform">
+                                                <RotateCcw size={10} /> {tSettings.reset.toUpperCase()}
                                             </button>
                                          </div>
                                          <div className="space-y-5">
-                                             <QuickSlider label={tSettings.focusDuration} value={settings.workTime} onChange={v => setSettings({...settings, workTime: v})} max={90} colorClass="text-rose-500" />
+                                             <QuickSlider label={tSettings.focusDuration} value={settings.workTime} onChange={handleWorkTimeChange} max={90} colorClass="text-rose-500" />
                                              <QuickSlider label={tSettings.shortBreak} value={settings.shortBreakTime} onChange={v => setSettings({...settings, shortBreakTime: v})} max={30} colorClass="text-amber-500" />
                                              <QuickSlider label={tSettings.longBreak} value={settings.longBreakTime} onChange={v => setSettings({...settings, longBreakTime: v})} max={45} colorClass="text-emerald-500" />
                                              <div className="border-t border-gray-100 my-2" />
                                              <QuickSlider label={tSettings.intervals} value={settings.pomodorosPerRound} onChange={v => setSettings({...settings, pomodorosPerRound: v})} max={10} colorClass="text-indigo-500" unit="" />
+                                             {/* Pomodoro also uses the notification panel in the dropdown */}
+                                             <NotificationPanel />
                                          </div>
                                     </div>
                                 </motion.div>
@@ -352,7 +502,9 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                             <div className="flex justify-between items-center mb-4">
                                 <span className="text-sm font-bold text-gray-500 uppercase">{t.duration}</span>
-                                <span className="text-xl font-mono font-bold text-blue-600">{customDuration}m</span>
+                                <span className="text-xl font-mono font-bold text-blue-600">
+                                    {formatMinutes(customDuration)}
+                                </span>
                             </div>
                             <input 
                                 type="range" 
@@ -363,9 +515,20 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                 onChange={(e) => {
                                      const val = sliderValueToMinutes(parseInt(e.target.value));
                                      setCustomDuration(val);
+
+                                     // FIX: Auto-trim notifications that are longer than the new duration
+                                     const validList = settings.customNotifications.filter(n => n < val);
+                                     if (validList.length !== settings.customNotifications.length) {
+                                         setSettings(prev => ({
+                                             ...prev,
+                                             customNotifications: validList
+                                         }));
+                                     }
                                 }}
                                 className="w-full h-4 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-500"
                             />
+                            {/* Independent Custom Notification Panel */}
+                            <NotificationPanel />
                         </div>
                     </motion.div>
                 )}
@@ -378,9 +541,13 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         exit={{ opacity: 0 }}
                         className="w-full"
                      >
-                        <div className="bg-white/40 p-3 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2">
-                            <Clock size={16} className="text-gray-400" />
-                            <span className="text-sm text-gray-500">{t.stopwatchActive}</span>
+                        <div className="bg-white p-4 rounded-2xl border border-gray-100 flex flex-col gap-2">
+                            <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                <Clock size={16} className="text-gray-400" />
+                                <span className="text-sm text-gray-500">{t.stopwatchActive}</span>
+                            </div>
+                            {/* Independent Stopwatch Notification Panel */}
+                            <NotificationPanel />
                         </div>
                      </motion.div>
                 )}
@@ -448,7 +615,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                        <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
                                        <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
                                             <Calendar size={14} className="text-purple-500"/>
-                                           {currentTask.durationMinutes}m
+                                           {formatMinutes(currentTask.durationMinutes)}
                                        </div>
                                    </div>
                                    <div className="flex flex-col items-start">
@@ -486,6 +653,52 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </motion.button>
         </div>
       </div>
+      
+      {/* Notification Picker Modal */}
+      <AnimatePresence>
+        {isNotificationPickerOpen && (
+            <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60] flex items-center justify-center p-4"
+                onClick={() => setIsNotificationPickerOpen(false)}
+            >
+                <motion.div 
+                    initial={{ scale: 0.9, y: 10 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 10 }}
+                    className="bg-white w-full max-w-[300px] rounded-2xl p-6 shadow-2xl relative"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-gray-900">{tSettings.notifyAt}</h3>
+                        <button onClick={() => setIsNotificationPickerOpen(false)} className="bg-gray-100 p-1 rounded-full text-gray-500">
+                            <X size={16} />
+                        </button>
+                    </div>
+
+                    <div className="flex justify-center mb-6">
+                        <div className="w-24">
+                            <IOSWheelPicker 
+                                items={notificationPickerItems} 
+                                selected={pickerValue} 
+                                onChange={setPickerValue} 
+                                label="Time" 
+                            />
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={handleAddNotification}
+                        className="w-full py-3 bg-blue-500 text-white rounded-xl font-bold active:scale-95 transition-transform"
+                    >
+                        {tSettings.addNotification}
+                    </button>
+                </motion.div>
+            </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

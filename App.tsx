@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
@@ -41,6 +42,9 @@ function App() {
       shortBreakTime: 5, 
       longBreakTime: 15, 
       pomodorosPerRound: 4,
+      notifications: [], // Pomodoro defaults
+      customNotifications: [], // Custom defaults
+      stopwatchNotifications: [], // Stopwatch defaults
       language: navigator.language.startsWith('zh') ? 'zh' : 'en' 
   });
 
@@ -59,6 +63,11 @@ function App() {
                 if (!savedSettings.language) {
                     savedSettings.language = navigator.language.startsWith('zh') ? 'zh' : 'en';
                 }
+                // Ensure notification fields exist (migration)
+                if (!savedSettings.notifications) savedSettings.notifications = [];
+                if (!savedSettings.customNotifications) savedSettings.customNotifications = [];
+                if (!savedSettings.stopwatchNotifications) savedSettings.stopwatchNotifications = [];
+
                 setSettings(savedSettings);
             }
 

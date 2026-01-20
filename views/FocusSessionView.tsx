@@ -53,6 +53,15 @@ interface SessionSegmentLog {
     distractionCount: number; 
 }
 
+// Helper to format minutes into "1h 30m" or "45m"
+const formatMinutes = (m: number) => {
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    if (min === 0) return `${h}h`;
+    return `${h}h ${min}m`;
+};
+
 const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, task, user, onComplete, onCancel, onUpgradeTrigger }) => {
   const t = translations[settings.language].session;
 
@@ -464,8 +473,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   };
 
   const formatTime = (seconds: number) => {
-      const m = Math.floor(seconds / 60);
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
       const s = seconds % 60;
+      
+      // Show Hours if > 0
+      if (h > 0) {
+          return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      }
       return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -536,7 +551,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         {breakStats && (
                             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 grid grid-cols-2 gap-8 mb-8 border border-white/5">
                                 <div className="text-center border-r border-white/10">
-                                    <div className="text-2xl font-bold text-white mb-1">{breakStats.duration}m</div>
+                                    <div className="text-2xl font-bold text-white mb-1">
+                                        {formatMinutes(breakStats.duration)}
+                                    </div>
                                     <div className="text-xs text-blue-200 uppercase tracking-wider">{breakStats.label}</div>
                                 </div>
                                 <div className="text-center">
@@ -598,9 +615,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         <p className="text-gray-500">{t.focusedFor} <span className="text-green-600 font-bold">{
                             (() => {
                                 const m = totalFocusedSecondsRef.current / 60;
-                                return Number(m.toFixed(1));
+                                return formatMinutes(Number(m.toFixed(1)));
                             })()
-                        } {t.minutes}</span>.</p>
+                        }</span>.</p>
                     </div>
 
                     <div className="px-6 mt-8 space-y-4 pb-20 relative z-10">
@@ -640,7 +657,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                         <div key={i} className="flex-shrink-0 w-8 flex flex-col justify-end group relative h-full">
                                             {/* Tooltip */}
                                             <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                                                {seg.score}% ({seg.duration}m)
+                                                {seg.score}% ({formatMinutes(seg.duration)})
                                             </div>
                                             
                                             {/* Bar */}
@@ -689,7 +706,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                                      </div>
                                                      <div>
                                                          <div className="text-sm font-bold text-gray-900">{log.startTime}</div>
-                                                         <div className="text-xs text-gray-400">{log.durationMinutes} min</div>
+                                                         <div className="text-xs text-gray-400">{formatMinutes(log.durationMinutes)}</div>
                                                      </div>
                                                  </div>
                                                  <div className="text-right">

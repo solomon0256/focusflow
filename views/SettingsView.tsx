@@ -1,10 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton } from '../components/IOSComponents';
 import { Settings, User, Product, LanguageCode } from '../types';
 import { SAAS_CONFIG } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translations, LANGUAGE_NAMES } from '../utils/translations';
+
+// Helper to format minutes
+const formatMinutes = (m: number) => {
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    if (min === 0) return `${h}h`;
+    return `${h}h ${min}m`;
+};
 
 // --- Reusable Row Components ---
 interface SettingRowProps {
@@ -54,7 +63,9 @@ const SliderRow = React.memo<SliderRowProps>(({ label, value, onChange, min = 0,
       <div className="py-3">
           <div className="flex justify-between items-center mb-2">
              <span className="font-medium text-gray-900">{label}</span>
-             <span className="text-blue-600 font-bold w-12 text-right">{value}{unit}</span>
+             <span className="text-blue-600 font-bold w-12 text-right">
+                {unit === 'm' ? formatMinutes(value) : `${value}${unit}`}
+             </span>
           </div>
           <input 
             type="range" 
@@ -127,8 +138,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           workTime: 25,
           shortBreakTime: 5,
           longBreakTime: 15,
-          pomodorosPerRound: 4
+          pomodorosPerRound: 4,
+          notifications: []
       }));
+  };
+
+  // Safe update for work time to auto-remove invalid notifications
+  const handleWorkTimeChange = (v: number) => {
+      const validNotifications = settings.notifications.filter(n => n < v);
+      setSettings(prev => ({...prev, workTime: v, notifications: validNotifications}));
   };
 
   // --- Login Modal ---
@@ -408,10 +426,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           <SliderRow 
             label={t.focusDuration} 
             value={settings.workTime} 
-            onChange={(v) => setSettings({...settings, workTime: v})}
+            onChange={handleWorkTimeChange}
             min={1}
             max={90}
           />
+          
           <div className="border-t border-gray-100" />
           <SliderRow 
             label={t.shortBreak} 
