@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw } from 'lucide-react';
+import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton } from '../components/IOSComponents';
 import { Settings, User, Product } from '../types';
 import { SAAS_CONFIG } from '../config';
 import { motion, AnimatePresence } from 'framer-motion';
+import { translations } from '../utils/translations';
 
 // --- Reusable Row Components ---
 interface SettingRowProps {
@@ -78,6 +79,7 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user, onLogin, onLogout, onUpgrade }) => {
+  const t = translations[settings.language].settings;
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
@@ -136,9 +138,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 mb-4">
                       <Cloud size={32} />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">Sync with Cloud</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">{t.cloudSync}</h2>
                   <p className="text-gray-500 text-sm text-center mt-2 px-2">
-                      Backup your data and access Premium across devices.
+                      {t.proDesc}
                   </p>
               </div>
 
@@ -175,7 +177,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                 </div>
                 <div className="text-center text-white z-10 mt-4">
                     <Crown size={48} className="mx-auto mb-2 animate-bounce" />
-                    <h2 className="text-2xl font-bold">FocusFlow Pro</h2>
+                    <h2 className="text-2xl font-bold">{t.proTitle}</h2>
                 </div>
                 <div className="absolute top-[-20%] left-[-20%] w-64 h-64 bg-white/20 rounded-full blur-3xl"/>
             </div>
@@ -252,7 +254,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                     Recurring billing, cancel anytime. By continuing you agree to our Terms of Service and Privacy Policy.
                 </p>
                 <button onClick={handleRestorePurchases} className="w-full mt-3 py-1 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors">
-                    Restore Purchases
+                    {t.restore}
                 </button>
             </div>
         </motion.div>
@@ -261,7 +263,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
 
   return (
     <div className="pt-8 pb-32 px-6 h-full overflow-y-auto no-scrollbar relative">
-       <h1 className="text-3xl font-bold text-gray-900 mb-6">Settings</h1>
+       <h1 className="text-3xl font-bold text-gray-900 mb-6">{t.title}</h1>
 
        {/* Premium Banner */}
        {!user?.isPremium ? (
@@ -271,10 +273,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
            >
               <div className="flex items-start justify-between relative z-10 pointer-events-none">
                  <div>
-                     <h2 className="text-xl font-bold mb-1">FocusFlow Pro</h2>
-                     <p className="text-sm opacity-90 mb-4">Sync data & support development.</p>
+                     <h2 className="text-xl font-bold mb-1">{t.proTitle}</h2>
+                     <p className="text-sm opacity-90 mb-4">{t.proDesc}</p>
                      <div className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold shadow-md inline-block">
-                         View Offer
+                         {t.viewOffer}
                      </div>
                  </div>
                  <div className="opacity-80">
@@ -289,14 +291,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                     <Crown size={24} fill="currentColor" />
                 </div>
                 <div>
-                    <h2 className="text-lg font-bold">Pro Member</h2>
-                    <p className="text-sm text-gray-400">Thank you for your support!</p>
+                    <h2 className="text-lg font-bold">{t.proMember}</h2>
+                    <p className="text-sm text-gray-400">{t.thanks}</p>
                 </div>
             </div>
        )}
 
        {/* Account Section */}
-       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2">Cloud Sync</h2>
+       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2">{t.cloudSync}</h2>
        <IOSCard className="px-4 py-1">
           {user ? (
             <>
@@ -316,7 +318,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                 <div className="border-t border-gray-100" />
                 <SettingRow 
                     icon={LogOut} 
-                    label="Sign Out" 
+                    label={t.signOut} 
                     type="danger" 
                     color="bg-transparent text-red-500"
                     onClick={onLogout}
@@ -325,7 +327,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           ) : (
             <SettingRow 
                 icon={Cloud} 
-                label="Enable Cloud Sync" 
+                label={t.enableCloud} 
                 value="Off" 
                 color="bg-gray-400" 
                 onClick={() => setShowLoginModal(true)}
@@ -334,18 +336,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
        </IOSCard>
 
        <div className="flex justify-between items-end mb-2 ml-2 mt-6 pr-2">
-           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Timer Configuration</h2>
+           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{t.timerConfig}</h2>
            <button 
                onClick={handleReset}
                className="text-[10px] font-bold text-blue-500 flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md active:scale-95 transition-transform"
            >
                <RotateCcw size={10} />
-               Reset
+               {t.reset}
            </button>
        </div>
        <IOSCard className="px-4 py-1">
           <SliderRow 
-            label="Focus Duration" 
+            label={t.focusDuration} 
             value={settings.workTime} 
             onChange={(v) => setSettings({...settings, workTime: v})}
             min={1}
@@ -353,7 +355,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           />
           <div className="border-t border-gray-100" />
           <SliderRow 
-            label="Short Break" 
+            label={t.shortBreak} 
             value={settings.shortBreakTime} 
             onChange={(v) => setSettings({...settings, shortBreakTime: v})}
             min={1}
@@ -361,7 +363,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           />
           <div className="border-t border-gray-100" />
            <SliderRow 
-            label="Long Break" 
+            label={t.longBreak} 
             value={settings.longBreakTime} 
             onChange={(v) => setSettings({...settings, longBreakTime: v})}
             min={5}
@@ -369,7 +371,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           />
           <div className="border-t border-gray-100" />
            <SliderRow 
-            label="Intervals" 
+            label={t.intervals} 
             value={settings.pomodorosPerRound} 
             onChange={(v) => setSettings({...settings, pomodorosPerRound: v})}
             min={1}
@@ -378,15 +380,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           />
        </IOSCard>
 
-       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">Support</h2>
+       {/* LANGUAGE SETTINGS */}
+       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">{t.language}</h2>
        <IOSCard className="px-4 py-1">
-           <SettingRow icon={CreditCard} label="Restore Purchases" color="bg-green-500" onClick={handleRestorePurchases} />
+            <SettingRow 
+                icon={Languages} 
+                label="English / 中文" 
+                value={settings.language === 'en' ? 'English' : '中文'} 
+                color="bg-purple-500" 
+                onClick={() => setSettings({...settings, language: settings.language === 'en' ? 'zh' : 'en'})}
+            />
+       </IOSCard>
+
+       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">{t.support}</h2>
+       <IOSCard className="px-4 py-1">
+           <SettingRow icon={CreditCard} label={t.restore} color="bg-green-500" onClick={handleRestorePurchases} />
            <div className="border-t border-gray-100" />
-           <SettingRow icon={Shield} label="Privacy Policy" color="bg-blue-500" />
+           <SettingRow icon={Shield} label={t.privacy} color="bg-blue-500" />
        </IOSCard>
 
        <div className="text-center mt-8 mb-4">
-           <p className="text-xs text-gray-400">FocusFlow v1.2.0</p>
+           <p className="text-xs text-gray-400">FocusFlow v1.3.0</p>
            <p className="text-xs text-gray-300 mt-1">Local-First Architecture</p>
        </div>
 

@@ -3,14 +3,17 @@ import { BarChart, Bar, XAxis, Tooltip, Cell, YAxis, CartesianGrid } from 'recha
 import { motion, AnimatePresence } from 'framer-motion';
 import { IOSCard } from '../components/IOSComponents';
 import { Award, Zap, Clock, CheckCircle2, ChevronDown, ChevronUp, Brain, Frown, Coffee, TrendingUp } from 'lucide-react';
-import { Task, FocusRecord } from '../types';
+import { Task, FocusRecord, Settings } from '../types';
+import { translations } from '../utils/translations';
 
 interface StatsViewProps {
     tasks: Task[];
     focusHistory: FocusRecord[];
+    settings: Settings; // Added settings prop
 }
 
-const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory }) => {
+const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings }) => {
+  const t = translations[settings.language].stats;
   const [isPetExpanded, setIsPetExpanded] = useState(false);
   
   // Ref to measure the container
@@ -169,7 +172,7 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory }) => {
     <div className="h-full w-full bg-[#f2f2f7] overflow-y-auto no-scrollbar pt-safe-top pb-32 px-4">
       
       <div className="flex items-center justify-between mb-4 mt-2 px-1">
-        <h1 className="text-3xl font-bold text-gray-900">Statistics</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
         <button className="bg-white p-2 rounded-full shadow-sm text-gray-400">
              <TrendingUp size={20} />
         </button>
@@ -182,8 +185,8 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory }) => {
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-3">
                 <Clock className="text-blue-500" size={20} />
             </div>
-            <span className="text-3xl font-bold text-gray-900 leading-none mb-1">{stats.focusHours}<span className="text-lg text-gray-400 font-medium ml-0.5">h</span></span>
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Today</span>
+            <span className="text-3xl font-bold text-gray-900 leading-none mb-1">{stats.focusHours}<span className="text-lg text-gray-400 font-medium ml-0.5">{t.focusHours}</span></span>
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.today}</span>
         </IOSCard>
         <IOSCard className="!mb-0 p-4 flex flex-col items-center justify-center min-h-[120px]">
              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mb-3">
@@ -193,15 +196,15 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory }) => {
                  <span className="text-3xl font-bold text-gray-900 leading-none">{stats.completedCount}</span>
                  <span className="text-sm text-gray-400 font-medium">/ {stats.totalTasksToday}</span>
              </div>
-             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tasks Done</span>
+             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.tasksDone}</span>
         </IOSCard>
       </div>
 
       {/* Chart Section */}
       <IOSCard className="!mb-4 p-5">
         <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-gray-800 text-lg">Weekly Activity</h3>
-            <div className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-md">Last 7 Days</div>
+            <h3 className="font-bold text-gray-800 text-lg">{t.weeklyActivity}</h3>
+            <div className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded-md">{t.last7Days}</div>
         </div>
         
         {/* Chart Container with Ref for measurement */}
@@ -254,7 +257,7 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory }) => {
             <Award size={24} />
         </div>
         <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-gray-900">Focus Master</h4>
+            <h4 className="font-bold text-gray-900">{t.focusMaster}</h4>
             <div className="flex justify-between items-center mt-1">
                 <span className="text-xs text-gray-500">72 / 100 hours</span>
                 <span className="text-xs font-bold text-yellow-600">72%</span>

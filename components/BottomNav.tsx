@@ -1,17 +1,22 @@
 import React from 'react';
 import { Clock, ListTodo, BarChart2, Settings as SettingsIcon } from 'lucide-react';
+import { Settings } from '../types';
+import { translations } from '../utils/translations';
 
 interface BottomNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  settings: Settings; // Added settings prop for language
 }
 
-const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, settings }) => {
+  const t = translations[settings.language].nav;
+  
   const tabs = [
-    { id: 'timer', label: 'Timer', icon: Clock },
-    { id: 'tasks', label: 'Tasks', icon: ListTodo },
-    { id: 'stats', label: 'Stats', icon: BarChart2 },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    { id: 'timer', label: t.timer, icon: Clock },
+    { id: 'tasks', label: t.tasks, icon: ListTodo },
+    { id: 'stats', label: t.stats, icon: BarChart2 },
+    { id: 'settings', label: t.settings, icon: SettingsIcon },
   ];
 
   return (

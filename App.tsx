@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
@@ -35,11 +34,14 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusRecord[]>([]);
+  
+  // Initialize with detected language
   const [settings, setSettings] = useState<Settings>({
       workTime: 25, 
       shortBreakTime: 5, 
       longBreakTime: 15, 
-      pomodorosPerRound: 4 
+      pomodorosPerRound: 4,
+      language: navigator.language.startsWith('zh') ? 'zh' : 'en' 
   });
 
   // --- 2. Async Initialization (The Circuit Init) ---
@@ -52,7 +54,13 @@ function App() {
 
             // Load Settings
             const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
-            if (savedSettings) setSettings(savedSettings);
+            if (savedSettings) {
+                // Ensure language field exists if migrating from old version
+                if (!savedSettings.language) {
+                    savedSettings.language = navigator.language.startsWith('zh') ? 'zh' : 'en';
+                }
+                setSettings(savedSettings);
+            }
 
             // Load Tasks
             const savedTasks = await NativeService.Storage.get<Task[]>(STORAGE_KEYS.TASKS);
@@ -235,13 +243,14 @@ function App() {
       case 'tasks':
         return <TasksView 
             tasks={tasks} 
+            settings={settings}
             addTask={addTask} 
             updateTask={updateTask}
             deleteTask={deleteTask}
             toggleTask={toggleTask} 
         />;
       case 'stats':
-        return <StatsView tasks={tasks} focusHistory={focusHistory} />;
+        return <StatsView tasks={tasks} focusHistory={focusHistory} settings={settings} />;
       case 'settings':
         return <SettingsView 
             settings={settings} 
@@ -264,7 +273,7 @@ function App() {
       <BottomNav activeTab={activeTab} setActiveTab={(tab) => {
           setActiveTab(tab);
           NativeService.Haptics.impactLight();
-      }} />
+      }} settings={settings} />
     </div>
   );
 }

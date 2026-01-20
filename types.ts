@@ -35,6 +35,7 @@ export interface Settings {
   shortBreakTime: number;
   longBreakTime: number;
   pomodorosPerRound: number;
+  language: 'en' | 'zh'; // New field
 }
 
 export interface FocusRecord {

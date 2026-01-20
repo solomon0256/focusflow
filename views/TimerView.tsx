@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { TimerMode, Task, Settings, Priority } from '../types';
 import { IOSSegmentedControl } from '../components/IOSComponents';
+import { translations } from '../utils/translations';
 
 interface TimerViewProps {
   tasks: Task[];
@@ -54,7 +55,9 @@ const QuickSlider = ({ label, value, onChange, max, colorClass, unit = 'm' }: { 
 );
 
 const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onStartSession }) => {
-  
+  const t = translations[settings.language].timer;
+  const tSettings = translations[settings.language].settings;
+
   // 1. Sort active tasks chronologically
   const sortedTasks = useMemo(() => {
     const active = tasks.filter(t => !t.completed);
@@ -116,15 +119,15 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   const timelineSegments = useMemo(() => {
     const segments = [];
     for (let i = 0; i < currentRounds; i++) {
-      segments.push({ type: 'work', duration: settings.workTime * 60, label: 'Focus' });
+      segments.push({ type: 'work', duration: settings.workTime * 60, label: t.focusTime });
       if (i < currentRounds - 1) {
-        segments.push({ type: 'shortBreak', duration: settings.shortBreakTime * 60, label: 'Break' });
+        segments.push({ type: 'shortBreak', duration: settings.shortBreakTime * 60, label: t.break });
       } else {
-        segments.push({ type: 'longBreak', duration: settings.longBreakTime * 60, label: 'Long Break' });
+        segments.push({ type: 'longBreak', duration: settings.longBreakTime * 60, label: t.break });
       }
     }
     return segments;
-  }, [settings, currentRounds]);
+  }, [settings, currentRounds, t]);
 
   const theme = useMemo(() => {
       return {
@@ -234,7 +237,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
 
             <div className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 text-gray-500 flex items-center gap-2`}>
                 <Brain size={12} className="text-blue-500"/>
-                <span>Ready to Focus</span>
+                <span>{t.ready}</span>
             </div>
             
             <div className="text-[18vw] font-thin font-mono tracking-tighter tabular-nums text-gray-900 leading-none drop-shadow-sm z-10">
@@ -256,7 +259,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         {/* Timeline Area - Always Visible */}
                         <div className="w-full">
                             <div className="flex justify-between text-xs text-gray-500 mb-2 px-1 font-bold uppercase tracking-widest">
-                                <span>Est. Cycle</span>
+                                <span>{t.estCycle}</span>
                                 <span>{Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60)}m</span>
                             </div>
                             
@@ -282,8 +285,8 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                             </div>
                             
                             <div className="flex justify-between mt-1 text-[10px] text-blue-400 font-bold px-1">
-                                <span>Focus Time: {settings.workTime}m</span>
-                                <span>Break: {settings.shortBreakTime}m</span>
+                                <span>{t.focusTime}: {settings.workTime}m</span>
+                                <span>{t.break}: {settings.shortBreakTime}m</span>
                             </div>
                         </div>
 
@@ -298,21 +301,21 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                 >
                                      <div className="bg-white/80 backdrop-blur-xl p-5 rounded-3xl shadow-sm border border-white/50 w-full">
                                          <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Quick Adjustment</span>
+                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{tSettings.timerConfig}</span>
                                             <button 
                                                 onClick={handleReset}
                                                 className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md active:scale-95 transition-transform"
                                             >
                                                 <RotateCcw size={10} />
-                                                RESET
+                                                {tSettings.reset.toUpperCase()}
                                             </button>
                                          </div>
                                          <div className="space-y-5">
-                                             <QuickSlider label="Focus" value={settings.workTime} onChange={v => setSettings({...settings, workTime: v})} max={90} colorClass="text-rose-500" />
-                                             <QuickSlider label="Short Break" value={settings.shortBreakTime} onChange={v => setSettings({...settings, shortBreakTime: v})} max={30} colorClass="text-amber-500" />
-                                             <QuickSlider label="Long Break" value={settings.longBreakTime} onChange={v => setSettings({...settings, longBreakTime: v})} max={45} colorClass="text-emerald-500" />
+                                             <QuickSlider label={tSettings.focusDuration} value={settings.workTime} onChange={v => setSettings({...settings, workTime: v})} max={90} colorClass="text-rose-500" />
+                                             <QuickSlider label={tSettings.shortBreak} value={settings.shortBreakTime} onChange={v => setSettings({...settings, shortBreakTime: v})} max={30} colorClass="text-amber-500" />
+                                             <QuickSlider label={tSettings.longBreak} value={settings.longBreakTime} onChange={v => setSettings({...settings, longBreakTime: v})} max={45} colorClass="text-emerald-500" />
                                              <div className="border-t border-gray-100 my-2" />
-                                             <QuickSlider label="Intervals" value={settings.pomodorosPerRound} onChange={v => setSettings({...settings, pomodorosPerRound: v})} max={10} colorClass="text-indigo-500" unit="" />
+                                             <QuickSlider label={tSettings.intervals} value={settings.pomodorosPerRound} onChange={v => setSettings({...settings, pomodorosPerRound: v})} max={10} colorClass="text-indigo-500" unit="" />
                                          </div>
                                     </div>
                                 </motion.div>
@@ -331,7 +334,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                     >
                         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                             <div className="flex justify-between items-center mb-4">
-                                <span className="text-sm font-bold text-gray-500 uppercase">Set Duration</span>
+                                <span className="text-sm font-bold text-gray-500 uppercase">{t.duration}</span>
                                 <span className="text-xl font-mono font-bold text-blue-600">{customDuration}m</span>
                             </div>
                             <input 
@@ -360,7 +363,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                      >
                         <div className="bg-white/40 p-3 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2">
                             <Clock size={16} className="text-gray-400" />
-                            <span className="text-sm text-gray-500">Stopwatch Mode Active</span>
+                            <span className="text-sm text-gray-500">{t.stopwatchActive}</span>
                         </div>
                      </motion.div>
                 )}
@@ -370,7 +373,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
         {/* 3. Task Slider (Naturally pushed down by flow layout) */}
         <div className="flex-none flex flex-col justify-center relative z-20">
             <div className="flex items-center justify-between mb-2 px-2">
-                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Select Task</span>
+                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t.selectTask}</span>
                 <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-center">
                     {sortedTasks.length > 0 ? `${browsingTaskIndex + 1} / ${sortedTasks.length}` : '0 / 0'}
                 </span>
@@ -418,21 +421,22 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                {/* Metadata Grid */}
                                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
                                    <div className="flex flex-col items-start">
-                                       <span className="text-[10px] font-bold text-gray-400 uppercase">Start</span>
+                                       <span className="text-[10px] font-bold text-gray-400 uppercase">{t.startLabel}</span>
                                        <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
                                            <Clock size={14} className="text-blue-500"/>
                                            {currentTask.time || '--:--'}
                                        </div>
                                    </div>
                                    <div className="flex flex-col items-start">
-                                       <span className="text-[10px] font-bold text-gray-400 uppercase">Duration</span>
+                                       <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
                                        <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
                                             <Calendar size={14} className="text-purple-500"/>
                                            {currentTask.durationMinutes}m
                                        </div>
                                    </div>
                                    <div className="flex flex-col items-start">
-                                       <span className="text-[10px] font-bold text-gray-400 uppercase">Promos</span>
+                                       {/* FIXED: Was "PROMOS", now localized */}
+                                       <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
                                        <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
                                             <Zap size={14} className="text-yellow-500"/>
                                             {currentTask.pomodoroCount}
@@ -449,8 +453,8 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                 </div>
             ) : (
                 <div className="bg-white/50 border-2 border-dashed border-gray-300 rounded-3xl p-6 flex flex-col items-center justify-center text-gray-400 min-h-[140px]">
-                    <p>No active tasks</p>
-                    <p className="text-xs mt-1">Add one in the Tasks tab</p>
+                    <p>{t.noTasks}</p>
+                    <p className="text-xs mt-1">{t.addOne}</p>
                 </div>
             )}
         </div>

@@ -1,35 +1,73 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Calendar as CalendarIcon, CheckCircle2, Circle, MoreHorizontal, Clock, Zap, Trash2, X, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, CheckCircle2, Circle, MoreHorizontal, Clock, Zap, Trash2, X, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Task, Priority } from '../types';
+import { Task, Priority, Settings } from '../types';
+import { IOSWheelPicker } from '../components/IOSWheelPicker';
+import { translations } from '../utils/translations';
 
 interface TasksViewProps {
   tasks: Task[];
+  settings: Settings; // Added settings prop
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
   deleteTask: (id: string) => void;
   toggleTask: (id: string) => void;
 }
 
-const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, deleteTask, toggleTask }) => {
-  // State
+const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateTask, deleteTask, toggleTask }) => {
+  const t = translations[settings.language].tasks;
+
+  // --- Main View State ---
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [pickerDate, setPickerDate] = useState(new Date()); // For navigating the custom calendar
+  const [pickerDate, setPickerDate] = useState(new Date()); // For navigating the custom calendar strip
 
+  // --- Modal State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  // Form State
+  // --- Form State ---
   const [formTitle, setFormTitle] = useState("");
-  const [formDate, setFormDate] = useState("");
-  const [formTime, setFormTime] = useState("");
   const [formPriority, setFormPriority] = useState<Priority>(Priority.MEDIUM);
   const [formDuration, setFormDuration] = useState(25);
   const [formPomodoros, setFormPomodoros] = useState(1);
   const [formNote, setFormNote] = useState("");
 
-  // Initialize form when opening modal
+  // --- New Date/Time Picker State ---
+  // We keep the raw values as the source of truth
+  const [formDate, setFormDate] = useState(""); // YYYY-MM-DD
+  const [formTime, setFormTime] = useState(""); // HH:mm (24h)
+  
+  // UI Toggles
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  
+  // Calendar Navigation State (Inside Modal)
+  const [modalCalendarCursor, setModalCalendarCursor] = useState(new Date());
+
+  // Time Wheel State (12h format)
+  const [wHour12, setWHour12] = useState("12");
+  const [wMinute, setWMinute] = useState("00");
+  const [wAmPm, setWAmPm] = useState("AM");
+
+  // --- Helpers for Time Conversion ---
+  const to12h = (time24: string) => {
+      if (!time24) return { h: "12", m: "00", p: "AM" };
+      const [h, m] = time24.split(':').map(Number);
+      const p = h >= 12 ? "PM" : "AM";
+      let h12 = h % 12;
+      if (h12 === 0) h12 = 12;
+      return { h: h12.toString(), m: m.toString().padStart(2,'0'), p };
+  };
+
+  const to24h = (h12: string, m: string, p: string) => {
+      let h = parseInt(h12);
+      if (p === "PM" && h !== 12) h += 12;
+      if (p === "AM" && h === 12) h = 0;
+      return `${h.toString().padStart(2,'0')}:${m}`;
+  };
+
+  // --- Initialization ---
   useEffect(() => {
     if (isModalOpen) {
         if (editingTask) {
@@ -40,21 +78,55 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
             setFormDuration(editingTask.durationMinutes);
             setFormPomodoros(editingTask.pomodoroCount);
             setFormNote(editingTask.note || "");
+            
+            // Init Calendar Cursor
+            setModalCalendarCursor(new Date(editingTask.date + "T00:00:00"));
+
+            // Init Wheels
+            const t = to12h(editingTask.time || "09:00"); // Default 9AM if no time
+            setWHour12(t.h.toString());
+            setWMinute(t.m);
+            setWAmPm(t.p);
         } else {
-            // New Task Defaults
+            // New Task
             setFormTitle("");
-            setFormDate(selectedDate.toISOString().split('T')[0]);
             const now = new Date();
-            const timeString = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-            setFormTime(timeString);
+            const dateStr = now.toISOString().split('T')[0];
+            setFormDate(dateStr);
+            setModalCalendarCursor(now);
+            
+            // Default time: Next hour
+            const nextHour = new Date();
+            nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+            const timeStr = `${nextHour.getHours().toString().padStart(2,'0')}:${nextHour.getMinutes().toString().padStart(2,'0')}`;
+            
+            setFormTime(timeStr);
+            
+            const t = to12h(timeStr);
+            setWHour12(t.h.toString());
+            setWMinute(t.m);
+            setWAmPm(t.p);
+
             setFormPriority(Priority.MEDIUM);
             setFormDuration(25);
             setFormPomodoros(1);
             setFormNote("");
         }
+        // Collapse pickers by default
+        setIsDatePickerOpen(false);
+        setIsTimePickerOpen(false);
     }
-  }, [isModalOpen, editingTask, selectedDate]);
+  }, [isModalOpen, editingTask]);
 
+  // Sync Wheel Changes to Form Time
+  useEffect(() => {
+      if (isModalOpen) {
+          const newTime = to24h(wHour12, wMinute, wAmPm);
+          setFormTime(newTime);
+      }
+  }, [wHour12, wMinute, wAmPm, isModalOpen]);
+
+  // --- Action Handlers ---
   const handleSave = () => {
     if (!formTitle.trim()) return;
 
@@ -99,14 +171,26 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
       setIsModalOpen(true);
   };
 
-  // --- Calendar Strip Logic (Weekly) ---
-  // Added <Date[]> to fix type inference
+  // --- Calendar Logic ---
+  const isSameDay = (d1: Date, d2: Date) => d1.toISOString().split('T')[0] === d2.toISOString().split('T')[0];
+  
+  const generateCalendarGrid = (cursorDate: Date) => {
+      const year = cursorDate.getFullYear();
+      const month = cursorDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
+      
+      const days = [];
+      for (let i = 0; i < firstDay; i++) days.push(null);
+      for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+      return days;
+  };
+
+  // --- Main View Data ---
   const weekDays = useMemo<Date[]>(() => {
     const days: Date[] = [];
     const start = new Date(selectedDate);
-    // Center the selected date roughly in the week view
     start.setDate(selectedDate.getDate() - 3);
-    
     for (let i = 0; i < 7; i++) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
@@ -115,17 +199,11 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
     return days;
   }, [selectedDate]);
 
-  const isSameDay = (d1: Date, d2: Date) => {
-      return d1.toISOString().split('T')[0] === d2.toISOString().split('T')[0];
-  };
-
   const hasTaskOnDay = (date: Date) => {
       const dateStr = date.toISOString().split('T')[0];
       return tasks.some(t => t.date === dateStr && !t.completed);
   };
 
-  // --- All Tasks Grouped Logic ---
-  // Added <Record<string, Task[]>> to fix type inference
   const groupedTasks = useMemo<Record<string, Task[]>>(() => {
       const groups: Record<string, Task[]> = {};
       const sorted = [...tasks].sort((a,b) => {
@@ -147,12 +225,11 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      if (dateStr === today.toISOString().split('T')[0]) return "Today";
-      if (dateStr === tomorrow.toISOString().split('T')[0]) return "Tomorrow";
-      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (dateStr === today.toISOString().split('T')[0]) return t.today;
+      if (dateStr === tomorrow.toISOString().split('T')[0]) return t.tomorrow;
+      return d.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  // --- Priority Helpers ---
   const getPriorityColor = (p: Priority) => {
       switch(p) {
           case Priority.HIGH: return 'bg-red-100 text-red-600 border-red-200';
@@ -162,107 +239,28 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
       }
   };
 
-  // --- Month Calendar Logic ---
-  const getDaysInMonth = (year: number, month: number) => {
-      return new Date(year, month + 1, 0).getDate();
-  };
-  const getFirstDayOfMonth = (year: number, month: number) => {
-      return new Date(year, month, 1).getDay();
-  };
-  
-  const generateMonthDays = () => {
-      const year = pickerDate.getFullYear();
-      const month = pickerDate.getMonth();
-      const daysInMonth = getDaysInMonth(year, month);
-      const firstDay = getFirstDayOfMonth(year, month); // 0 = Sunday
-      const days = [];
-      
-      // Empty slots for previous month
-      for (let i = 0; i < firstDay; i++) {
-          days.push(null);
-      }
-      // Days
-      for (let i = 1; i <= daysInMonth; i++) {
-          days.push(new Date(year, month, i));
-      }
-      return days;
-  };
+  // --- Wheel Data ---
+  const hours12 = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+  const minutes60 = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+  const ampms = ["AM", "PM"];
 
   return (
     <div className="pt-safe-top pb-32 px-4 h-full relative flex flex-col">
       
-      {/* Month Picker Overlay */}
-      <AnimatePresence>
-        {showMonthPicker && (
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="absolute top-16 right-4 z-50 bg-[#1c1c1e] text-white p-4 rounded-xl shadow-2xl w-72"
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <button onClick={() => setPickerDate(new Date(pickerDate.getFullYear(), pickerDate.getMonth() - 1, 1))}>
-                        <ChevronLeft size={20} className="text-gray-400" />
-                    </button>
-                    <span className="font-bold">
-                        {pickerDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                    </span>
-                    <button onClick={() => setPickerDate(new Date(pickerDate.getFullYear(), pickerDate.getMonth() + 1, 1))}>
-                        <ChevronRight size={20} className="text-gray-400" />
-                    </button>
-                </div>
-                <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                    {['S','M','T','W','T','F','S'].map(d => (
-                        <span key={d} className="text-xs text-gray-500 font-bold">{d}</span>
-                    ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                    {generateMonthDays().map((d, idx) => {
-                        if (!d) return <div key={idx} />;
-                        const isSelected = isSameDay(d, selectedDate);
-                        const isToday = isSameDay(d, new Date());
-                        return (
-                            <button 
-                                key={idx}
-                                onClick={() => {
-                                    setSelectedDate(d);
-                                    setShowMonthPicker(false);
-                                }}
-                                className={`h-8 w-8 rounded-full text-sm flex items-center justify-center transition-colors
-                                    ${isSelected ? 'bg-blue-600 font-bold' : isToday ? 'text-blue-400 font-bold' : 'hover:bg-gray-700'}
-                                `}
-                            >
-                                {d.getDate()}
-                            </button>
-                        );
-                    })}
-                </div>
-                <div className="mt-4 flex justify-between px-2">
-                     <button onClick={() => setShowMonthPicker(false)} className="text-xs text-gray-400">Cancel</button>
-                     <button onClick={() => { setSelectedDate(new Date()); setShowMonthPicker(false); }} className="text-xs text-blue-400 font-bold">Today</button>
-                </div>
-            </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Header */}
       <div className="flex justify-between items-center mb-4 mt-2 px-2">
          <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t.title}</h1>
             <p className="text-sm text-gray-500 font-medium">
-                {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {selectedDate.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
          </div>
-         <button 
-            onClick={() => setShowMonthPicker(!showMonthPicker)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm border
-                 ${showMonthPicker ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-gray-100'}
-            `}>
-            <CalendarIcon size={20} />
-         </button>
+         <div className="w-10 h-10 flex items-center justify-center">
+            {/* Placeholder for future filter button */}
+         </div>
       </div>
 
-      {/* Weekly Calendar Strip (Still useful for quick navigation) */}
+      {/* Weekly Calendar Strip */}
       <div className="bg-white p-3 rounded-2xl shadow-sm mb-6 flex justify-between items-center relative overflow-hidden flex-shrink-0">
           {weekDays.map((d, i) => {
               const isSelected = isSameDay(d, selectedDate);
@@ -277,12 +275,10 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                         ${isSelected ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 scale-105' : 'text-gray-400 hover:bg-gray-50'}
                     `}
                 >
-                    <span className="text-[10px] font-bold uppercase tracking-wide mb-0.5">{d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0,3)}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide mb-0.5">{d.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short' }).slice(0,3)}</span>
                     <span className={`text-xl font-semibold leading-none ${isSelected ? 'text-white' : isToday ? 'text-blue-600' : 'text-gray-800'}`}>
                         {d.getDate()}
                     </span>
-                    
-                    {/* Task Indicator Dot */}
                     <div className="h-1.5 mt-1 flex items-center justify-center">
                          {hasTask && (
                              <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-blue-500'}`} />
@@ -293,15 +289,15 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
           })}
       </div>
 
-      {/* Task List - Grouped by Date */}
+      {/* Task List */}
       <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 pb-32">
         {Object.keys(groupedTasks).length === 0 ? (
              <div className="flex flex-col items-center justify-center h-48 text-gray-400">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                     <CalendarDays size={24} className="opacity-50" />
                 </div>
-                <p>No tasks yet</p>
-                <button onClick={openAdd} className="text-blue-500 font-medium text-sm mt-2">Create your first task</button>
+                <p>{t.empty}</p>
+                <button onClick={openAdd} className="text-blue-500 font-medium text-sm mt-2">{t.createFirst}</button>
              </div>
         ) : (
             Object.entries(groupedTasks).map(([dateStr, dayTasks]) => (
@@ -320,7 +316,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                                 onClick={() => openEdit(task)}
                             >
                                 <div className="flex items-start gap-3">
-                                    {/* Checkbox */}
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
                                         className="mt-0.5 flex-shrink-0"
@@ -330,49 +325,20 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                                             <Circle className={`text-gray-300 ${task.priority === Priority.HIGH ? 'text-rose-400' : ''}`} size={24} />
                                         }
                                     </button>
-
-                                    {/* Content */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start">
                                             <h3 className={`font-semibold text-gray-900 truncate pr-2 ${task.completed ? 'line-through text-gray-400' : ''}`}>
                                                 {task.title}
                                             </h3>
                                         </div>
-
                                         <div className="flex flex-wrap items-center gap-2 mt-2">
-                                            {/* Time */}
-                                            {task.time && (
-                                                <span className="text-xs font-mono font-medium text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">
-                                                    {task.time}
-                                                </span>
-                                            )}
-
-                                            {/* Priority Badge */}
-                                            <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${getPriorityColor(task.priority)}`}>
-                                                {task.priority}
-                                            </span>
-                                            
-                                            {/* Pomodoro Count */}
-                                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                <Zap size={10} className="fill-gray-400 text-gray-400" /> 
-                                                {task.pomodoroCount}
-                                            </span>
-
-                                            {/* Duration */}
-                                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                <Clock size={10} /> 
-                                                {task.durationMinutes}m
-                                            </span>
+                                            {task.time && <span className="text-xs font-mono font-medium text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">{task.time}</span>}
+                                            <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${getPriorityColor(task.priority)}`}>{task.priority}</span>
+                                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded"><Zap size={10} className="fill-gray-400 text-gray-400" /> {task.pomodoroCount}</span>
+                                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded"><Clock size={10} /> {task.durationMinutes}m</span>
                                         </div>
-
-                                        {/* Note Preview */}
-                                        {task.note && (
-                                            <p className="text-xs text-gray-400 mt-2 line-clamp-1">
-                                                {task.note}
-                                            </p>
-                                        )}
+                                        {task.note && <p className="text-xs text-gray-400 mt-2 line-clamp-1">{task.note}</p>}
                                     </div>
-                                    
                                     <MoreHorizontal size={20} className="text-gray-300" />
                                 </div>
                             </motion.div>
@@ -383,7 +349,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
         )}
       </div>
 
-      {/* Floating Add Button */}
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={openAdd}
@@ -407,33 +372,137 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                     animate={{ y: 0 }}
                     exit={{ y: "100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                    className="bg-[#f2f2f7] w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[85vh] flex flex-col"
+                    className="bg-[#f2f2f7] w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[90vh] sm:h-[85vh] flex flex-col"
                     onClick={e => e.stopPropagation()}
                 >
                     <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                        <h2 className="text-xl font-bold text-gray-900">{editingTask ? 'Edit Task' : 'New Task'}</h2>
+                        <h2 className="text-xl font-bold text-gray-900">{editingTask ? t.editTask : t.newTask}</h2>
                         <button onClick={() => setIsModalOpen(false)} className="bg-gray-200 p-1 rounded-full text-gray-500">
                             <X size={20} />
                         </button>
                     </div>
                     
-                    <div className="overflow-y-auto flex-1 space-y-5 pb-4 px-1">
+                    <div className="overflow-y-auto flex-1 space-y-5 pb-4 px-1 no-scrollbar">
                         {/* Title Input */}
                         <div className="bg-white p-4 rounded-xl shadow-sm">
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Task Name</label>
                             <input 
                                 autoFocus
                                 type="text" 
-                                placeholder="What needs to be done?" 
+                                placeholder={t.whatToDo} 
                                 className="w-full text-lg font-medium outline-none placeholder:text-gray-300 bg-white"
                                 value={formTitle}
                                 onChange={(e) => setFormTitle(e.target.value)}
                             />
                         </div>
 
+                        {/* Date & Time Section (iOS Grouped Style) */}
+                        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                            {/* DATE ROW */}
+                            <div className="flex flex-col border-b border-gray-100">
+                                <div 
+                                    className="flex justify-between items-center p-4 cursor-pointer active:bg-gray-50 transition-colors"
+                                    onClick={() => {
+                                        setIsDatePickerOpen(!isDatePickerOpen);
+                                        setIsTimePickerOpen(false); // Close time if open
+                                    }}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-red-100 text-red-500 flex items-center justify-center">
+                                            <CalendarIcon size={18} />
+                                        </div>
+                                        <span className="font-medium text-gray-900">{t.date}</span>
+                                    </div>
+                                    <span className={`text-sm font-medium transition-colors ${isDatePickerOpen ? 'text-blue-500' : 'text-gray-500'}`}>
+                                        {new Date(formDate).toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                </div>
+                                
+                                {/* EXPANDABLE CALENDAR GRID */}
+                                <AnimatePresence>
+                                    {isDatePickerOpen && (
+                                        <motion.div 
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden bg-gray-50/50"
+                                        >
+                                            <div className="p-4">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <button onClick={() => setModalCalendarCursor(new Date(modalCalendarCursor.setMonth(modalCalendarCursor.getMonth() - 1)))} className="p-1 hover:bg-gray-200 rounded-full"><ChevronLeft size={20} className="text-gray-500"/></button>
+                                                    <span className="font-bold text-gray-900">{modalCalendarCursor.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' })}</span>
+                                                    <button onClick={() => setModalCalendarCursor(new Date(modalCalendarCursor.setMonth(modalCalendarCursor.getMonth() + 1)))} className="p-1 hover:bg-gray-200 rounded-full"><ChevronRight size={20} className="text-gray-500"/></button>
+                                                </div>
+                                                <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                                                    {['S','M','T','W','T','F','S'].map(d => <span key={d} className="text-[10px] text-gray-400 font-bold">{d}</span>)}
+                                                </div>
+                                                <div className="grid grid-cols-7 gap-1">
+                                                    {generateCalendarGrid(modalCalendarCursor).map((d, i) => {
+                                                        if (!d) return <div key={i} />;
+                                                        const isSelected = d.toISOString().split('T')[0] === formDate;
+                                                        const isToday = isSameDay(d, new Date());
+                                                        return (
+                                                            <button 
+                                                                key={i}
+                                                                onClick={() => setFormDate(d.toISOString().split('T')[0])}
+                                                                className={`h-9 w-9 rounded-full text-sm flex items-center justify-center transition-all
+                                                                    ${isSelected ? 'bg-blue-600 text-white font-bold shadow-md' : isToday ? 'text-blue-600 font-bold bg-blue-50' : 'text-gray-700 hover:bg-white'}
+                                                                `}
+                                                            >
+                                                                {d.getDate()}
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {/* TIME ROW */}
+                            <div className="flex flex-col">
+                                <div 
+                                    className="flex justify-between items-center p-4 cursor-pointer active:bg-gray-50 transition-colors"
+                                    onClick={() => {
+                                        setIsTimePickerOpen(!isTimePickerOpen);
+                                        setIsDatePickerOpen(false); // Close date if open
+                                    }}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-500 flex items-center justify-center">
+                                            <Clock size={18} />
+                                        </div>
+                                        <span className="font-medium text-gray-900">{t.time}</span>
+                                    </div>
+                                    <div className={`text-sm font-medium px-2 py-1 rounded-md transition-colors ${isTimePickerOpen ? 'bg-gray-100 text-blue-500' : 'text-gray-500'}`}>
+                                        {to12h(formTime).h}:{to12h(formTime).m} <span className="text-[10px] uppercase ml-0.5">{to12h(formTime).p}</span>
+                                    </div>
+                                </div>
+
+                                {/* EXPANDABLE WHEEL PICKER (AM/PM) */}
+                                <AnimatePresence>
+                                    {isTimePickerOpen && (
+                                        <motion.div 
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden bg-gray-50/50"
+                                        >
+                                            <div className="flex gap-2 p-4 justify-center">
+                                                <div className="w-16"><IOSWheelPicker items={hours12} selected={wHour12} onChange={setWHour12} label="Hour" /></div>
+                                                <div className="text-xl font-bold text-gray-300 mt-10">:</div>
+                                                <div className="w-16"><IOSWheelPicker items={minutes60} selected={wMinute} onChange={setWMinute} label="Min" /></div>
+                                                <div className="w-16"><IOSWheelPicker items={ampms} selected={wAmPm} onChange={setWAmPm} label="Meridiem" /></div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+
                         {/* Priority Selector */}
                         <div className="bg-white p-4 rounded-xl shadow-sm">
-                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Priority</label>
+                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t.priority}</label>
                              <div className="flex gap-2">
                                 {[Priority.LOW, Priority.MEDIUM, Priority.HIGH].map(p => (
                                     <button 
@@ -452,32 +521,10 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                              </div>
                         </div>
 
-                        {/* Date & Time Row */}
-                        <div className="flex gap-3">
-                            <div className="flex-[1.5] bg-white p-3 rounded-xl shadow-sm">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Date</label>
-                                <input 
-                                    type="date" 
-                                    className="w-full text-sm font-semibold text-gray-800 outline-none bg-white"
-                                    value={formDate}
-                                    onChange={(e) => setFormDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex-1 bg-white p-3 rounded-xl shadow-sm">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Start Time</label>
-                                <input 
-                                    type="time" 
-                                    className="w-full text-sm font-semibold text-gray-800 outline-none bg-white"
-                                    value={formTime}
-                                    onChange={(e) => setFormTime(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
                         {/* Est Time Slider (0-4h) */}
                         <div className="bg-white p-4 rounded-xl shadow-sm">
                              <div className="flex justify-between items-center mb-4">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Est. Duration</label>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">{t.estDuration}</label>
                                 <span className="text-blue-600 font-bold font-mono">{formDuration} min</span>
                              </div>
                              <input 
@@ -501,8 +548,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                         {/* Pomodoro Count (Max 7) */}
                         <div className="bg-white p-4 rounded-xl shadow-sm flex items-center justify-between">
                             <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">Pomodoros</label>
-                                <p className="text-xs text-gray-400 mt-0.5">Sessions per task</p>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">{t.pomodoros}</label>
+                                <p className="text-xs text-gray-400 mt-0.5">{t.sessionsPerTask}</p>
                             </div>
                             <div className="flex items-center gap-3 bg-gray-50 px-2 py-1 rounded-lg">
                                 <button onClick={() => setFormPomodoros(Math.max(1, formPomodoros - 1))} className="w-8 h-8 flex items-center justify-center bg-white shadow-sm rounded-md text-gray-600 font-bold active:scale-95 transition-transform">-</button>
@@ -513,11 +560,11 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
 
                         {/* Notes */}
                         <div className="bg-white p-4 rounded-xl shadow-sm">
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Note</label>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t.note}</label>
                             <textarea 
                                 rows={3}
                                 className="w-full text-sm text-gray-800 outline-none resize-none placeholder:text-gray-300 bg-white"
-                                placeholder="Add any details..."
+                                placeholder={t.note}
                                 value={formNote}
                                 onChange={(e) => setFormNote(e.target.value)}
                             />
@@ -531,14 +578,14 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, addTask, updateTask, delet
                                 onClick={handleDelete}
                                 className="flex-1 py-3.5 rounded-xl font-semibold text-red-500 bg-red-50 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
                                 >
-                                <Trash2 size={18} /> Delete
+                                <Trash2 size={18} /> {t.delete}
                                 </button>
                             )}
                             <button 
                             onClick={handleSave}
                             className="flex-[2] py-3.5 rounded-xl font-semibold text-white bg-blue-600 shadow-lg shadow-blue-200 active:scale-95 transition-all"
                             >
-                            {editingTask ? 'Save Changes' : 'Create Task'}
+                            {editingTask ? t.save : t.create}
                             </button>
                     </div>
                 </motion.div>
