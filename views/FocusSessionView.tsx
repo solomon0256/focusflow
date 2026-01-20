@@ -68,8 +68,10 @@ const formatMinutes = (m: number) => {
 const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, task, user, onComplete, onCancel, onUpgradeTrigger }) => {
   const t = translations[settings.language].session;
   
-  // Determine Detection Interval
+  // Determine Detection Interval & Resolution Target
   const detectionInterval = settings.batterySaverMode ? INTERVAL_SAVER : INTERVAL_BALANCED;
+  // Eco Mode: 360p (low res) vs Standard: 480p (VGA)
+  const targetResolution = settings.batterySaverMode ? { width: 480, height: 360 } : { width: 640, height: 480 };
 
   // --- UI States ---
   const [sessionState, setSessionState] = useState<SessionState>('INIT');
@@ -166,8 +168,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
             setLoadingStatus('Accessing Camera...');
             await new Promise(r => setTimeout(r, 500)); 
 
+            // DYNAMIC RESOLUTION BASED ON BATTERY MODE
             stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+                video: { 
+                    facingMode: 'user', 
+                    width: { ideal: targetResolution.width }, 
+                    height: { ideal: targetResolution.height }, 
+                    frameRate: { ideal: 30 } // Keep HW fps high for exposure
+                },
                 audio: false
             });
 
@@ -210,7 +218,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         if (poseLandmarkerRef.current) poseLandmarkerRef.current.close();
     };
-  }, []);
+  }, []); // Re-run if resolution target changes (though usually requires full reload in React to be clean)
 
   // 2. Countdown
   useEffect(() => {
@@ -489,6 +497,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.font = "14px monospace";
       ctx.fillText(`Target: ${targetFPS} FPS`, 20, 30);
       ctx.fillText(`Actual: ${fpsRef.current.toFixed(1)} FPS`, 20, 50);
+      // Show resolution for debug
+      ctx.fillText(`Res: ${canvas.width}x${canvas.height}`, 20, 130);
       
       const landmarks = results.landmarks?.[0];
 

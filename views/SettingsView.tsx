@@ -94,6 +94,7 @@ interface SettingsViewProps {
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user, onLogin, onLogout, onUpgrade, onInjectData }) => {
   const t = translations[settings.language].settings;
   const tPremium = translations[settings.language].premium;
+  const tFooter = translations[settings.language].footer; // New Footer translations
   
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -623,9 +624,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                 onClick={() => setShowDevModal(true)}
                 className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 mx-auto"
            >
-               <Terminal size={10} /> FocusFlow v1.3.0 (Build 2024.1)
+               <Terminal size={10} /> {tFooter.version}
            </button>
-           <p className="text-[10px] text-gray-300 mt-1">Local-First Architecture</p>
+           <p className="text-[10px] text-gray-300 mt-1">{tFooter.architecture}</p>
        </div>
 
        <AnimatePresence>
