@@ -40,7 +40,8 @@ export interface Settings {
   notifications: number[]; // Used for POMODORO mode
   customNotifications: number[]; // Used for CUSTOM mode
   stopwatchNotifications: number[]; // Used for STOPWATCH mode
-  language: LanguageCode; 
+  language: LanguageCode;
+  batterySaverMode: boolean; // New Power Saver Toggle
 }
 
 export interface FocusRecord {

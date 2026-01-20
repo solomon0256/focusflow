@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle } from 'lucide-react';
+import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle, Battery } from 'lucide-react';
 import { TimerMode, Task, User, Settings } from '../types';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
 import { NativeService } from '../services/native';
@@ -19,7 +19,10 @@ interface FocusSessionViewProps {
 }
 
 // --- CONFIGURATION ---
-const DETECTION_INTERVAL_MS = 200; 
+// STANDARD: 200ms = 5 FPS (Balanced)
+// SAVER: 500ms = 2 FPS (Eco)
+const INTERVAL_BALANCED = 200;
+const INTERVAL_SAVER = 500;
 
 // --- ASSETS ---
 const CDN_WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm";
@@ -64,6 +67,9 @@ const formatMinutes = (m: number) => {
 
 const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, task, user, onComplete, onCancel, onUpgradeTrigger }) => {
   const t = translations[settings.language].session;
+  
+  // Determine Detection Interval
+  const detectionInterval = settings.batterySaverMode ? INTERVAL_SAVER : INTERVAL_BALANCED;
 
   // --- UI States ---
   const [sessionState, setSessionState] = useState<SessionState>('INIT');
@@ -242,7 +248,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       NativeService.Haptics.notificationSuccess();
   };
 
-  // 3. AI Loop
+  // 3. AI Loop (Optimized for Battery Saver)
   useEffect(() => {
       if (sessionState === 'ACTIVE' && phase === 'WORK' && !isAiDisabled && !isPaused) {
           const predictWebcam = () => {
@@ -252,7 +258,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               
               if (video && landmarker && !video.paused && !video.ended && isVideoReady) {
                   const now = performance.now();
-                  if (now - lastPredictionTimeRef.current >= DETECTION_INTERVAL_MS) {
+                  // DYNAMIC THROTTLING HERE
+                  // If battery saver is on, this delta check prevents running the model too often
+                  if (now - lastPredictionTimeRef.current >= detectionInterval) {
                       const delta = now - lastFrameTimeRef.current;
                       if (delta > 0) fpsRef.current = 1000 / delta; 
                       lastFrameTimeRef.current = now;
@@ -272,7 +280,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           requestRef.current = requestAnimationFrame(predictWebcam);
       }
       return () => cancelAnimationFrame(requestRef.current);
-  }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase]);
+  }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase, detectionInterval]); // Re-bind if interval changes
 
   // --- LOGIC: Record Stats (SIMPLIFIED ALGORITHM) ---
   const recordCycleStats = (durationMinutes: number) => {
@@ -473,12 +481,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Draw FPS
+      const targetFPS = settings.batterySaverMode ? 2 : 5;
+      
       ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
       ctx.fillRect(10, 10, 240, 150);
       ctx.fillStyle = "#00FF00";
       ctx.font = "14px monospace";
-      ctx.fillText(`Mode: Power Saver (5 FPS)`, 20, 30);
-      ctx.fillText(`FPS: ${fpsRef.current.toFixed(1)}`, 20, 50);
+      ctx.fillText(`Target: ${targetFPS} FPS`, 20, 30);
+      ctx.fillText(`Actual: ${fpsRef.current.toFixed(1)} FPS`, 20, 50);
       
       const landmarks = results.landmarks?.[0];
 
@@ -815,6 +825,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         {(!isAiDisabled) && (
                             <div className="flex flex-col gap-1 mt-2">
                                 <div className="flex items-center gap-2">
+                                    {settings.batterySaverMode && (
+                                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 text-green-400 backdrop-blur-md rounded-md border border-green-500/50">
+                                            <Battery size={10} fill="currentColor" />
+                                            <span className="text-[10px] font-bold uppercase">Eco Mode</span>
+                                        </div>
+                                    )}
                                     {!isPremium ? (
                                         <div className="flex gap-2">
                                             <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 text-green-400 backdrop-blur-md rounded-md border border-green-500/50">

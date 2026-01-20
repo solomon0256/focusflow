@@ -44,7 +44,8 @@ function App() {
       notifications: [], // Pomodoro defaults
       customNotifications: [], // Custom defaults
       stopwatchNotifications: [], // Stopwatch defaults
-      language: navigator.language.startsWith('zh') ? 'zh' : 'en' 
+      language: navigator.language.startsWith('zh') ? 'zh' : 'en',
+      batterySaverMode: false // Default to Standard Mode (5 FPS)
   });
 
   // --- 2. Async Initialization (The Circuit Init) ---
@@ -93,6 +94,8 @@ function App() {
                 if (!savedSettings.notifications) savedSettings.notifications = [];
                 if (!savedSettings.customNotifications) savedSettings.customNotifications = [];
                 if (!savedSettings.stopwatchNotifications) savedSettings.stopwatchNotifications = [];
+                // Ensure battery mode exists
+                if (savedSettings.batterySaverMode === undefined) savedSettings.batterySaverMode = false;
 
                 setSettings(savedSettings);
             }

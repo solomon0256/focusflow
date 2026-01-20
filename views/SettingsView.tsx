@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages, Beaker, Terminal, Loader2 } from 'lucide-react';
+import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages, Beaker, Terminal, Loader2, Battery, Zap } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton } from '../components/IOSComponents';
 import { Settings, User, Product, LanguageCode, Task, FocusRecord, TimerMode, Priority } from '../types';
 import { SAAS_CONFIG } from '../config';
@@ -577,6 +577,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
             unit=""
           />
        </IOSCard>
+
+       {/* POWER SAVING SETTINGS */}
+       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">Performance</h2>
+       <IOSCard className="px-4 py-1">
+            <SettingRow 
+                icon={Battery} 
+                label="Power Saver" 
+                value={settings.batterySaverMode} 
+                type="toggle"
+                color="bg-green-500" 
+                onChange={(v) => setSettings({...settings, batterySaverMode: v})}
+            />
+            {settings.batterySaverMode && (
+                <div className="pb-3 px-1">
+                     <p className="text-[10px] text-gray-400 leading-tight">
+                         Reduces AI detection to 2 FPS. Keeps camera active but saves battery during long sessions.
+                     </p>
+                </div>
+            )}
+       </IOSCard>
+
 
        {/* LANGUAGE SETTINGS */}
        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">{t.language}</h2>
