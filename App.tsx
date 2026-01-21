@@ -6,7 +6,7 @@ import TasksView from './views/TasksView';
 import StatsView from './views/StatsView';
 import SettingsView from './views/SettingsView';
 import FocusSessionView from './views/FocusSessionView';
-import { Task, Settings, Priority, FocusRecord, TimerMode, User } from './types';
+import { Task, Settings, Priority, FocusRecord, TimerMode, User, LanguageCode } from './types';
 import { NativeService } from './services/native';
 import { Zap } from 'lucide-react';
 
@@ -30,6 +30,8 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusRecord[]>([]);
+  
+  // Default language logic: ALWAYS default to 'en' unless a supported language is explicitly saved
   const [settings, setSettings] = useState<Settings>({
       workTime: 25, 
       shortBreakTime: 5, 
@@ -38,7 +40,7 @@ function App() {
       notifications: [],
       customNotifications: [],
       stopwatchNotifications: [],
-      language: navigator.language.startsWith('zh') ? 'zh' : 'en',
+      language: 'en', // Strict default
       batterySaverMode: false
   });
 
@@ -60,8 +62,16 @@ function App() {
                     pet: { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' }
                 });
             }
+            
             const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
-            if (savedSettings) setSettings(savedSettings);
+            if (savedSettings) {
+                // Ensure language is one of the supported codes, else fallback to 'en'
+                const supportedCodes: LanguageCode[] = ['en', 'zh', 'zh-TW', 'fr', 'ja', 'ko', 'es', 'ru', 'ar', 'de', 'hi'];
+                if (!supportedCodes.includes(savedSettings.language)) {
+                    savedSettings.language = 'en';
+                }
+                setSettings(savedSettings);
+            }
 
             const savedTasks = await NativeService.Storage.get<Task[]>(STORAGE_KEYS.TASKS);
             if (savedTasks) setTasks(savedTasks);
@@ -100,16 +110,14 @@ function App() {
       return 1;
   };
 
-  // Hard Progression Formula: 300 base + level^1.5 * 50
   const calculateMaxExp = (level: number) => {
-      return 300 + Math.floor(Math.pow(level, 1.5) * 50);
+      return 300 + Math.floor(Math.pow(level, 1.6) * 25);
   };
 
   const processStreakAndExp = (currentUser: User, minutes: number, dateStr: string, isTaskComplete: boolean = false) => {
       const pet = currentUser.pet;
       const lastActivityStr = pet.lastDailyActivityDate;
       
-      // 1. Calculate Daily Streak EXP & Streak Increment
       let newStreak = pet.streakCount;
       let streakExp = 0;
 
@@ -133,13 +141,8 @@ function App() {
           streakExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
       }
 
-      // 2. Focus Time EXP (+25 per hour = 0.416 per min)
-      const focusExp = minutes * (25 / 60);
-
-      // 3. Task Completion EXP (+10)
+      const focusExp = minutes * 0.4;
       const taskExp = isTaskComplete ? 10 : 0;
-
-      // 4. Update EXP & Level
       let newExp = pet.currentExp + streakExp + focusExp + taskExp;
       let newLevel = pet.level;
       let newMaxExp = pet.maxExp || calculateMaxExp(newLevel);
@@ -210,7 +213,6 @@ function App() {
             activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => {
                 const updatedTask = tasks.find(t => t.id === id);
                 if (updatedTask && !updatedTask.completed && user) {
-                    // Task marked as complete - reward EXP
                     const dateStr = new Date().toISOString().split('T')[0];
                     setUser(processStreakAndExp(user, 0, dateStr, true));
                 }
