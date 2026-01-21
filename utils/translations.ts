@@ -4,59 +4,10 @@ import { LanguageCode } from '../types';
 type TranslationKeys = typeof en;
 
 const en = {
-  common: {
-    confirm: 'Confirm',
-    cancel: 'Cancel',
-    back: 'Back',
-    save: 'Save',
-    delete: 'Delete',
-    loading: 'Loading...'
-  },
-  nav: {
-    timer: 'Timer',
-    tasks: 'Tasks',
-    stats: 'Stats',
-    settings: 'Settings'
-  },
-  timer: {
-    ready: 'Ready to Focus',
-    estCycle: 'Est. Cycle',
-    focusTime: 'Focus Time',
-    break: 'Break',
-    start: 'Start',
-    pause: 'Pause',
-    resume: 'Resume',
-    stopwatchActive: 'Stopwatch Mode Active',
-    noTasks: 'No active tasks',
-    addOne: 'Add one in the Tasks tab',
-    selectTask: 'Select Task',
-    startLabel: 'START',
-    duration: 'DURATION',
-    pomos: 'POMOS',
-    mode_pomodoro: 'Pomodoro',
-    mode_stopwatch: 'Stopwatch',
-    mode_custom: 'Custom'
-  },
-  tasks: {
-    title: 'My Tasks',
-    empty: 'No tasks yet',
-    createFirst: 'Create your first task',
-    newTask: 'New Task',
-    editTask: 'Edit Task',
-    whatToDo: 'What needs to be done?',
-    date: 'Date',
-    time: 'Time',
-    priority: 'Priority',
-    estDuration: 'Est. Duration',
-    pomodoros: 'Pomodoros',
-    sessionsPerTask: 'Sessions per task',
-    note: 'Note',
-    delete: 'Delete',
-    save: 'Save Changes',
-    create: 'Create Task',
-    today: 'Today',
-    tomorrow: 'Tomorrow'
-  },
+  common: { confirm: 'Confirm', cancel: 'Cancel', back: 'Back', save: 'Save', delete: 'Delete', loading: 'Loading...' },
+  nav: { timer: 'Timer', tasks: 'Tasks', stats: 'Stats', settings: 'Settings' },
+  timer: { ready: 'Ready to Focus', estCycle: 'Est. Cycle', focusTime: 'Focus Time', break: 'Break', start: 'Start', pause: 'Pause', resume: 'Resume', stopwatchActive: 'Stopwatch Mode Active', noTasks: 'No active tasks', addOne: 'Add one in the Tasks tab', selectTask: 'Select Task', startLabel: 'START', duration: 'DURATION', pomos: 'POMOS', mode_pomodoro: 'Pomodoro', mode_stopwatch: 'Stopwatch', mode_custom: 'Custom' },
+  tasks: { title: 'My Tasks', empty: 'No tasks yet', createFirst: 'Create your first task', newTask: 'New Task', editTask: 'Edit Task', whatToDo: 'What needs to be done?', date: 'Date', time: 'Time', priority: 'Priority', estDuration: 'Est. Duration', pomodoros: 'Pomodoros', sessionsPerTask: 'Sessions per task', note: 'Note', delete: 'Delete', save: 'Save Changes', create: 'Create Task', today: 'Today', tomorrow: 'Tomorrow' },
   stats: {
     title: 'Statistics',
     focusHours: 'h',
@@ -68,7 +19,17 @@ const en = {
     companion: 'Your Companion',
     petName: 'FOX',
     happiness: 'HAPPINESS',
-    level: 'Lv.',
+    level: 'Rank:',
+    academicRanks: [
+        "Kindergarten", "Elementary 1st", "Elementary 2nd", "Elementary 3rd", "Elementary 4th", "Elementary 5th", "Elementary 6th",
+        "Middle Sch. 7th", "Middle Sch. 8th", "Middle Sch. 9th",
+        "High Sch. Fresh.", "High Sch. Soph.", "High Sch. Junior", "High Sch. Senior",
+        "College Fresh.", "College Soph.", "College Junior", "College Senior",
+        "Master's 1st", "Master's 2nd",
+        "PhD Candidate", "PhD Researcher", "PhD Finalist",
+        "Postdoc Fellow",
+        "Assistant Prof.", "Associate Prof.", "Full Professor", "Academic Dean"
+    ],
     tapCollapse: 'Tap to collapse',
     tapExpand: 'Focus more to feed!',
     deepFocus: 'Deep Focus',
@@ -111,49 +72,9 @@ const en = {
     powerSaver: 'Power Saver',
     powerSaverDesc: 'Reduces AI detection rate to save battery. Camera remains active for focus tracking.'
   },
-  footer: {
-      version: 'FocusFlow v1.4.0 (Pet Phase)',
-      architecture: 'Local-First Architecture'
-  },
-  premium: {
-    feat_sync: 'Sync across iPhone, iPad & Android',
-    feat_history: 'Unlimited Focus History & Statistics',
-    feat_skins: "Exclusive 'FOX' Pet Skins",
-    feat_noise: 'Advanced White Noise Library',
-    feat_support: 'Support Indie Development ❤️',
-    monthly_name: 'Monthly',
-    monthly_desc: 'Billed monthly. Cancel anytime.',
-    yearly_name: 'Yearly',
-    yearly_desc: '12 months at best price.',
-    yearly_tag: 'SAVE 45%',
-    lifetime_name: 'Lifetime',
-    lifetime_desc: 'One-time payment. Own it forever.',
-    lifetime_tag: 'BEST VALUE'
-  },
-  session: {
-    complete: 'Session Complete!',
-    focusedFor: 'You stayed focused for',
-    minutes: 'minutes',
-    avgFocus: 'Avg Focus',
-    posture: 'Posture',
-    timeline: 'Focus Timeline',
-    cycleLog: 'Cycle Log',
-    backHome: 'Back to Home',
-    recharge: 'Time to Recharge',
-    rest: 'Well Earned Rest',
-    breathe: 'Take a deep breath. Look away from screen.',
-    skipBreak: 'Skip Break',
-    paused: 'Paused',
-    focusGuard: 'Focus Guard',
-    proPosture: 'Pro: Posture',
-    fullBodyAi: 'Full Body AI',
-    focusTime: 'Focus Time',
-    taskCompleted: 'Task Completed',
-    markAsDone: 'Mark as done?',
-    sessionDoneAuto: 'Session complete! Task marked as done.',
-    sessionDoneManual: 'Session complete. Mark task as done?',
-    earlyStop: 'Session stopped early.'
-  }
+  footer: { version: 'FocusFlow v1.4.0 (Pet Phase)', architecture: 'Local-First Architecture' },
+  premium: { feat_sync: 'Sync across iPhone, iPad & Android', feat_history: 'Unlimited Focus History & Statistics', feat_skins: "Exclusive 'FOX' Pet Skins", feat_noise: 'Advanced White Noise Library', feat_support: 'Support Indie Development ❤️', monthly_name: 'Monthly', monthly_desc: 'Billed monthly. Cancel anytime.', yearly_name: 'Yearly', yearly_desc: '12 months at best price.', yearly_tag: 'SAVE 45%', lifetime_name: 'Lifetime', lifetime_desc: 'One-time payment. Own it forever.', lifetime_tag: 'BEST VALUE' },
+  session: { complete: 'Session Complete!', focusedFor: 'You stayed focused for', minutes: 'minutes', avgFocus: 'Avg Focus', posture: 'Posture', timeline: 'Focus Timeline', cycleLog: 'Cycle Log', backHome: 'Back to Home', recharge: 'Time to Recharge', rest: 'Well Earned Rest', breathe: 'Take a deep breath. Look away from screen.', skipBreak: 'Skip Break', paused: 'Paused', focusGuard: 'Focus Guard', proPosture: 'Pro: Posture', fullBodyAi: 'Full Body AI', focusTime: 'Focus Time', taskCompleted: 'Task Completed', markAsDone: 'Mark as done?', sessionDoneAuto: 'Session complete! Task marked as done.', sessionDoneManual: 'Session complete. Mark task as done?', earlyStop: 'Session stopped early.' }
 };
 
 export const translations: Record<LanguageCode, TranslationKeys> = {
@@ -164,7 +85,40 @@ export const translations: Record<LanguageCode, TranslationKeys> = {
     nav: { timer: '计时', tasks: '任务', stats: '统计', settings: '设置' },
     timer: { ready: '准备专注', estCycle: '预计时长', focusTime: '专注时长', break: '休息', start: '开始', pause: '暂停', resume: '继续', stopwatchActive: '正计时模式运行中', noTasks: '暂无进行中的任务', addOne: '去任务页添加一个吧', selectTask: '选择任务', startLabel: '开始', duration: '时长', pomos: '番茄数', mode_pomodoro: '番茄钟', mode_stopwatch: '正计时', mode_custom: '自定义' },
     tasks: { title: '我的任务', empty: '暂无任务', createFirst: '创建你的第一个任务', newTask: '新建任务', editTask: '编辑任务', whatToDo: '准备做什么？', date: '日期', time: '时间', priority: '优先级', estDuration: '预计时长', pomodoros: '番茄钟', sessionsPerTask: '个番茄时间 / 任务', note: '备注', delete: '删除', save: '保存修改', create: '创建任务', today: '今天', tomorrow: '明天' },
-    stats: { title: '数据统计', focusHours: '小时', today: '今日专注', tasksDone: '完成任务', weeklyActivity: '周活跃度', last7Days: '最近7天', focusMaster: '专注达人', companion: '你的伙伴', petName: 'FOX', happiness: '开心值', level: 'Lv.', tapCollapse: '点击收起', tapExpand: '多专注来喂养它！', deepFocus: '深度专注', focused: '专注中', zoningOut: '游离', distracted: '分心', streakTitle: '连胜奖励', streakDays: '连续登录', todayTier: '当前等级', expReward: '专注可得', streakCushion: '缓冲保护生效中' },
+    stats: { 
+        title: '数据统计', 
+        focusHours: '小时', 
+        today: '今日专注', 
+        tasksDone: '完成任务', 
+        weeklyActivity: '周活跃度', 
+        last7Days: '最近7天', 
+        focusMaster: '专注达人', 
+        companion: '你的伙伴', 
+        petName: 'FOX', 
+        happiness: '开心值', 
+        level: '',
+        academicRanks: [
+            "幼稚园", "小学一年级", "小学二年级", "小学三年级", "小学四年级", "小学五年级", "小学六年级",
+            "初一 (7年级)", "初二 (8年级)", "初三 (9年级)",
+            "高一 (10年级)", "高二 (11年级)", "高三 (12年级)", "高四 (Senior)",
+            "大一 (Freshman)", "大二 (Sophomore)", "大三 (Junior)", "大四 (Senior)",
+            "硕士研一", "硕士研二",
+            "博士候选人", "博士研究员", "博士毕业年",
+            "博士后工作站",
+            "助理教授", "副教授", "终身教授", "院士 / 院长"
+        ],
+        tapCollapse: '点击收起', 
+        tapExpand: '多专注来喂养它！', 
+        deepFocus: '深度专注', 
+        focused: '专注中', 
+        zoningOut: '游离', 
+        distracted: '分心', 
+        streakTitle: '连胜奖励', 
+        streakDays: '连续登录', 
+        todayTier: '当前等级', 
+        expReward: '专注可得', 
+        streakCushion: '缓冲保护生效中' 
+    },
     settings: { title: '设置', proTitle: 'FocusFlow Pro', proDesc: '云端同步 & 支持开发者', viewOffer: '查看详情', proMember: 'Pro 会员', thanks: '感谢您的支持！', cloudSync: '云同步', enableCloud: '开启云同步', signOut: '退出登录', timerConfig: '计时器配置', focusDuration: '专注时长', shortBreak: '短休息', longBreak: '长休息', intervals: '每轮番茄数', language: '语言', support: '支持', restore: '恢复购买', privacy: '隐私政策', reset: '重置', choosePlan: '选择方案', recurring: '自动续费，随时取消。继续即代表同意服务条款和隐私政策。', subscribe: '订阅 价格:', notifications: '通知提醒', addNotification: '添加时间', notifyAt: '提醒时间', performance: '性能模式', powerSaver: '省电模式', powerSaverDesc: '降低AI检测频率以节省电量。专注追踪功能保持开启。' },
     footer: { version: 'FocusFlow v1.4.0 (宠物版本)', architecture: 'Local-First 隐私优先架构' },
     premium: { feat_sync: '多端同步 (iOS/Android)', feat_history: '无限历史记录与统计', feat_skins: '解锁“FOX”限定皮肤', feat_noise: '高级白噪音库', feat_support: '支持独立开发者 ❤️', monthly_name: '月度会员', monthly_desc: '按月付费，随时取消。', yearly_name: '年度会员', yearly_desc: '12个月超值优惠。', yearly_tag: '省 45%', lifetime_name: '终身买断', lifetime_desc: '一次付费，永久拥有。', lifetime_tag: '最超值' },
@@ -192,5 +146,5 @@ export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
     ru: 'Русский',
     ar: 'العربية',
     de: 'Deutsch',
-    hi: 'हिन्दी'
+    hi: '希न्दी'
 };

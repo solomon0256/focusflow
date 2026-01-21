@@ -94,24 +94,49 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
       return 5;
   };
 
+  // Helper to get Rank Title
+  const getRankTitle = (level: number) => {
+      const ranks = t.academicRanks || [];
+      const index = Math.max(0, Math.min(level - 1, ranks.length - 1));
+      return ranks[index];
+  };
+
+  // Helper to get evolving Emojis for now
+  const getPetEmoji = (level: number) => {
+      if (level <= 7) return "🦊"; // 幼儿/小学
+      if (level <= 14) return "🎒"; // 中学/高中
+      if (level <= 18) return "🎓"; // 大学
+      if (level <= 24) return "🔬"; // 研究生/博后
+      return "🏛️"; // 教授/院长
+  };
+
   const PetCard = () => (
     <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white overflow-hidden shadow-lg shadow-indigo-200 mb-4 relative z-0">
         <div className="p-5 sm:p-6 relative z-10 cursor-pointer" onClick={() => setIsPetExpanded(!isPetExpanded)}>
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h3 className="text-indigo-100 font-semibold mb-1 text-sm">{t.companion}</h3>
-                    <h2 className="text-2xl font-bold">{t.petName}</h2>
+                    <div className="flex items-baseline gap-2">
+                        <h2 className="text-3xl font-bold">{t.petName}</h2>
+                        {/* Precision: Moved Rank label here next to name */}
+                        <span className="bg-white/20 px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-md border border-white/10 tracking-tight">
+                            {getRankTitle(user?.pet.level || 1)}
+                        </span>
+                    </div>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
                     {isPetExpanded ? <ChevronUp className="text-white" size={20} /> : <ChevronDown className="text-white" size={20} />}
                 </div>
             </div>
             <div className="flex items-center gap-5">
-                <div className="text-6xl animate-bounce filter drop-shadow-lg">🦊</div>
+                {/* Pet Image with level-based emoji */}
+                <div className="text-6xl animate-bounce filter drop-shadow-lg">
+                    {getPetEmoji(user?.pet.level || 1)}
+                </div>
                 <div className="flex-1">
                     <div className="flex justify-between items-end mb-1.5">
                         <div className="text-xs text-indigo-100 font-bold tracking-wider">{t.happiness}</div>
-                        <div className="text-xs text-indigo-100 font-mono opacity-80">{t.level} {user?.pet.level || 1}</div>
+                        <div className="text-xs text-indigo-100 font-mono opacity-80 uppercase tracking-tighter">LV {user?.pet.level || 1}</div>
                     </div>
                     <div className="w-full h-2.5 bg-black/20 rounded-full overflow-hidden backdrop-blur-sm">
                         <motion.div 
@@ -123,7 +148,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                 </div>
             </div>
 
-            {/* Precision Restoration: Pet Expanded Area */}
             <AnimatePresence>
                 {isPetExpanded && (
                     <motion.div 
@@ -145,7 +169,7 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                                 <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-widest">EXP PROGRESS</span>
                                 <div className="flex items-center gap-2 mt-1.5">
                                     <Zap size={14} className="text-yellow-400 fill-yellow-400" />
-                                    <span className="text-xl font-bold">{user?.pet.currentExp}/{user?.pet.maxExp}</span>
+                                    <span className="text-xl font-bold">{Math.round(user?.pet.currentExp || 0)}/{user?.pet.maxExp}</span>
                                 </div>
                             </div>
                         </div>
@@ -201,7 +225,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                   <div className="flex flex-col items-end"><span className="text-[10px] text-gray-400 font-bold uppercase">{t.expReward}</span><div className="flex items-center gap-1"><Zap size={14} className="text-yellow-500 fill-yellow-500" /><span className="text-lg font-bold text-gray-900">+{getExpReward(todayTier)} EXP</span></div></div>
               </div>
 
-              {/* Enhanced Simulation Tools */}
               <div className="pt-3 border-t border-gray-100">
                   <div className="flex items-center gap-2 mb-2">
                       <TestTube2 size={12} className="text-purple-400" />
@@ -209,8 +232,8 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                       <button onClick={() => onSimulate?.(5)} className="py-2 bg-gray-100 rounded-lg text-[9px] font-bold text-gray-500 active:scale-95 transition-transform">5m (Mock)</button>
-                      <button onClick={() => onSimulate?.(12, 0)} className="py-2 bg-blue-50 rounded-lg text-[9px] font-bold text-blue-600 active:scale-95 transition-transform">12m (Today)</button>
-                      <button onClick={() => onSimulate?.(12, 1)} className="py-2 bg-indigo-50 rounded-lg text-[9px] font-bold text-indigo-600 active:scale-95 transition-transform">12m (+1 Day)</button>
+                      <button onClick={() => onSimulate?.(60, 0)} className="py-2 bg-blue-50 rounded-lg text-[9px] font-bold text-blue-600 active:scale-95 transition-transform">1h (Today)</button>
+                      <button onClick={() => onSimulate?.(120, 1)} className="py-2 bg-indigo-50 rounded-lg text-[9px] font-bold text-indigo-600 active:scale-95 transition-transform">2h (+1 Day)</button>
                       <button onClick={onBreakStreak} className="py-2 bg-red-50 rounded-lg text-[9px] font-bold text-red-600 active:scale-95 transition-transform flex items-center justify-center gap-1"><Trash2 size={10} /> Break</button>
                   </div>
               </div>

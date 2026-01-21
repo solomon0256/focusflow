@@ -48,7 +48,7 @@ function App() {
             const savedUser = await NativeService.Storage.get<User>(STORAGE_KEYS.USER);
             if (savedUser) {
                 if (!savedUser.pet) {
-                    savedUser.pet = { level: 1, currentExp: 0, maxExp: 100, happiness: 100, streakCount: 0, lastDailyActivityDate: '' };
+                    savedUser.pet = { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' };
                 }
                 setUser(savedUser);
             } else {
@@ -57,7 +57,7 @@ function App() {
                     name: 'Guest',
                     email: '',
                     isPremium: false,
-                    pet: { level: 1, currentExp: 0, maxExp: 100, happiness: 100, streakCount: 0, lastDailyActivityDate: '' }
+                    pet: { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' }
                 });
             }
             const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
@@ -100,47 +100,67 @@ function App() {
       return 1;
   };
 
-  const processStreakAndExp = (currentUser: User, minutes: number, dateStr: string) => {
-      if (minutes < 12) return currentUser;
+  // Hard Progression Formula: 300 base + level^1.5 * 50
+  const calculateMaxExp = (level: number) => {
+      return 300 + Math.floor(Math.pow(level, 1.5) * 50);
+  };
 
-      const lastActivityStr = currentUser.pet.lastDailyActivityDate;
+  const processStreakAndExp = (currentUser: User, minutes: number, dateStr: string, isTaskComplete: boolean = false) => {
+      const pet = currentUser.pet;
+      const lastActivityStr = pet.lastDailyActivityDate;
       
-      // If the record happened on the same date as last activity, skip streak increment
-      if (lastActivityStr === dateStr) return currentUser; 
+      // 1. Calculate Daily Streak EXP & Streak Increment
+      let newStreak = pet.streakCount;
+      let streakExp = 0;
 
-      let newStreak = currentUser.pet.streakCount;
-      if (lastActivityStr) {
-          const lastDate = new Date(lastActivityStr);
-          const currentDate = new Date(dateStr);
-          const diffDays = Math.floor((currentDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (diffDays === 1) newStreak += 1;
-          else if (diffDays > 1) {
-              const oldTier = getTier(currentUser.pet.streakCount);
-              newStreak = oldTier === 4 ? 2 : 1;
-          } else if (diffDays <= 0) {
-              // Same day or backward - keep current streak or at least 1
-              newStreak = Math.max(1, newStreak);
+      if (lastActivityStr !== dateStr) {
+          if (lastActivityStr) {
+              const lastDate = new Date(lastActivityStr);
+              const currentDate = new Date(dateStr);
+              const diffDays = Math.floor((currentDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+              
+              if (diffDays === 1) newStreak += 1;
+              else if (diffDays > 1) {
+                  const oldTier = getTier(pet.streakCount);
+                  newStreak = oldTier === 4 ? 2 : 1;
+              } else {
+                  newStreak = Math.max(1, newStreak);
+              }
+          } else {
+              newStreak = 1;
           }
-      } else {
-          newStreak = 1;
+          const tier = getTier(newStreak);
+          streakExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
       }
 
-      const tier = getTier(newStreak);
-      const gainedExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
-      let newExp = currentUser.pet.currentExp + gainedExp;
-      let newLevel = currentUser.pet.level;
-      let newMaxExp = currentUser.pet.maxExp;
+      // 2. Focus Time EXP (+25 per hour = 0.416 per min)
+      const focusExp = minutes * (25 / 60);
+
+      // 3. Task Completion EXP (+10)
+      const taskExp = isTaskComplete ? 10 : 0;
+
+      // 4. Update EXP & Level
+      let newExp = pet.currentExp + streakExp + focusExp + taskExp;
+      let newLevel = pet.level;
+      let newMaxExp = pet.maxExp || calculateMaxExp(newLevel);
 
       while (newExp >= newMaxExp) {
           newLevel += 1;
           newExp -= newMaxExp;
-          newMaxExp = Math.floor(100 * Math.pow(1.3, newLevel - 1));
+          newMaxExp = calculateMaxExp(newLevel);
       }
 
       return {
           ...currentUser,
-          pet: { ...currentUser.pet, level: newLevel, currentExp: newExp, maxExp: newMaxExp, streakCount: newStreak, lastDailyActivityDate: dateStr, happiness: Math.min(100, currentUser.pet.happiness + 10) }
+          pet: { 
+              ...pet, 
+              level: newLevel, 
+              currentExp: newExp, 
+              maxExp: newMaxExp, 
+              streakCount: newStreak, 
+              lastDailyActivityDate: dateStr, 
+              happiness: Math.min(100, pet.happiness + (minutes > 12 ? 10 : 0)) 
+          }
       };
   };
 
@@ -151,14 +171,13 @@ function App() {
       
       addFocusRecord(minutes, TimerMode.POMODORO, dateStr);
       if (user) {
-          setUser(processStreakAndExp(user, minutes, dateStr));
+          setUser(processStreakAndExp(user, minutes, dateStr, false));
       }
       NativeService.Haptics.notificationSuccess();
   };
 
   const handleBreakStreak = () => {
       if (!user) return;
-      // Force last activity to 2 days ago to simulate a streak break cushion
       const mockDate = new Date();
       mockDate.setDate(mockDate.getDate() - 2); 
       const mockDateStr = mockDate.toISOString().split('T')[0];
@@ -170,7 +189,7 @@ function App() {
       if (currentSessionParams) {
           const dateStr = new Date().toISOString().split('T')[0];
           addFocusRecord(minutes, currentSessionParams.mode, dateStr);
-          if (user) setUser(prev => prev ? processStreakAndExp(prev, minutes, dateStr) : null);
+          if (user) setUser(prev => prev ? processStreakAndExp(prev, minutes, dateStr, taskCompleted) : null);
           if (currentSessionParams.taskId && taskCompleted) {
               setTasks(prev => prev.map(t => t.id === currentSessionParams.taskId ? { ...t, completed: true } : t));
           }
@@ -188,7 +207,15 @@ function App() {
             <FocusSessionView mode={currentSessionParams.mode} initialTimeInSeconds={currentSessionParams.durationMinutes * 60} settings={settings} user={user} task={tasks.find(t => t.id === currentSessionParams.taskId)} onComplete={handleSessionComplete} onCancel={() => setIsFocusSessionActive(false)} onUpgradeTrigger={() => { setIsFocusSessionActive(false); setActiveTab('settings'); }} />
         ) : (
             activeTab === 'timer' ? <TimerView tasks={tasks.filter(t => !t.completed)} settings={settings} setSettings={setSettings} onRecordTime={addFocusRecord} onStartSession={(d, m, tId) => { setCurrentSessionParams({ durationMinutes: d, mode: m, taskId: tId }); setIsFocusSessionActive(true); }} /> :
-            activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => setTasks(prev => prev.map(x => x.id === id ? { ...x, completed: !x.completed } : x))} /> :
+            activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => {
+                const updatedTask = tasks.find(t => t.id === id);
+                if (updatedTask && !updatedTask.completed && user) {
+                    // Task marked as complete - reward EXP
+                    const dateStr = new Date().toISOString().split('T')[0];
+                    setUser(processStreakAndExp(user, 0, dateStr, true));
+                }
+                setTasks(prev => prev.map(x => x.id === id ? { ...x, completed: !x.completed } : x))
+            }} /> :
             activeTab === 'stats' ? <StatsView tasks={tasks} focusHistory={focusHistory} settings={settings} onSimulate={handleSimulate} onBreakStreak={handleBreakStreak} /> :
             <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} />
         )}
