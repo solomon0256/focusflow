@@ -95,12 +95,13 @@ function App() {
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
   useEffect(() => { if(isAppReady && user) NativeService.Storage.set(STORAGE_KEYS.USER, user); }, [user, isAppReady]);
 
-  const addFocusRecord = (minutes: number, mode: TimerMode, date?: string) => {
+  const addFocusRecord = (minutes: number, mode: TimerMode, date?: string, score?: number) => {
       const newRecord: FocusRecord = {
           id: Date.now().toString() + Math.random(),
           date: date || new Date().toISOString().split('T')[0],
           durationMinutes: minutes,
-          mode: mode
+          mode: mode,
+          score: score || 100
       };
       setFocusHistory(prev => [...prev, newRecord]);
       return newRecord;
@@ -117,12 +118,12 @@ function App() {
       return 300 + Math.floor(Math.pow(level, 1.6) * 25);
   };
 
-  const processStreakAndExp = (currentUser: User, minutes: number, dateStr: string, isTaskComplete: boolean = false) => {
+  const processStreakAndExp = (currentUser: User, minutes: number, dateStr: string, isTaskComplete: boolean = false, score: number = 100) => {
       const pet = currentUser.pet;
       const lastActivityStr = pet.lastDailyActivityDate;
       
       let newStreak = pet.streakCount;
-      let streakExp = 0;
+      let streakExp = 0; // STREAK EXP IS NOT MULTIPLIED
 
       if (lastActivityStr !== dateStr) {
           if (lastActivityStr) {
@@ -140,13 +141,32 @@ function App() {
           } else {
               newStreak = 1;
           }
+          // Login / Streak Bonus Logic
           const tier = getTier(newStreak);
           streakExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
       }
 
-      const focusExp = minutes * 0.4;
-      const taskExp = isTaskComplete ? 10 : 0;
-      let newExp = pet.currentExp + streakExp + focusExp + taskExp;
+      // --- NEW: WEIGHTED EXP LOGIC ---
+      // Excellent (>90): x1.5
+      // Good (>75): x1.3
+      // Normal (>60): x1.0
+      // Tired (<=60): x0.8
+      let multiplier = 1.0;
+      if (score > 90) multiplier = 1.5;
+      else if (score > 75) multiplier = 1.3;
+      else if (score > 60) multiplier = 1.0;
+      else multiplier = 0.8;
+
+      // Base EXP: 0.4 per minute
+      const baseTimeExp = minutes * 0.4;
+      const baseTaskExp = isTaskComplete ? 10 : 0;
+      
+      // MULTIPLY ONLY TASK AND TIME EXP
+      const weightedActivityExp = Math.ceil((baseTimeExp + baseTaskExp) * multiplier); 
+      
+      // ADD STREAK EXP (FLAT)
+      let newExp = pet.currentExp + streakExp + weightedActivityExp;
+      
       let newLevel = pet.level;
       let newMaxExp = pet.maxExp || calculateMaxExp(newLevel);
 
@@ -175,9 +195,12 @@ function App() {
       if (dateOffset !== 0) d.setDate(d.getDate() + dateOffset);
       const dateStr = d.toISOString().split('T')[0];
       
-      addFocusRecord(minutes, TimerMode.POMODORO, dateStr);
+      // Simulate perfect focus (100)
+      const simScore = 100;
+
+      addFocusRecord(minutes, TimerMode.POMODORO, dateStr, simScore);
       if (user) {
-          setUser(processStreakAndExp(user, minutes, dateStr, false));
+          setUser(processStreakAndExp(user, minutes, dateStr, false, simScore));
       }
       NativeService.Haptics.notificationSuccess();
   };
@@ -191,11 +214,11 @@ function App() {
       NativeService.Haptics.impactMedium();
   };
 
-  const handleSessionComplete = (minutes: number, taskCompleted: boolean = false) => {
+  const handleSessionComplete = (minutes: number, taskCompleted: boolean = false, avgScore: number = 100) => {
       if (currentSessionParams) {
           const dateStr = new Date().toISOString().split('T')[0];
-          addFocusRecord(minutes, currentSessionParams.mode, dateStr);
-          if (user) setUser(prev => prev ? processStreakAndExp(prev, minutes, dateStr, taskCompleted) : null);
+          addFocusRecord(minutes, currentSessionParams.mode, dateStr, avgScore);
+          if (user) setUser(prev => prev ? processStreakAndExp(prev, minutes, dateStr, taskCompleted, avgScore) : null);
           if (currentSessionParams.taskId && taskCompleted) {
               setTasks(prev => prev.map(t => t.id === currentSessionParams.taskId ? { ...t, completed: true } : t));
           }

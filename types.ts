@@ -49,6 +49,7 @@ export interface FocusRecord {
     date: string; // YYYY-MM-DD
     durationMinutes: number;
     mode: TimerMode;
+    score?: number; // 0-100, Focus Quality Score
 }
 
 // --- PET SYSTEM TYPES ---

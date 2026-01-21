@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle, Battery } from 'lucide-react';
@@ -13,7 +14,7 @@ interface FocusSessionViewProps {
   settings: Settings;
   task?: Task;
   user: User | null;
-  onComplete: (minutesFocused: number, taskCompleted?: boolean) => void;
+  onComplete: (minutesFocused: number, taskCompleted?: boolean, avgScore?: number) => void;
   onCancel: () => void;
   onUpgradeTrigger: () => void;
 }
@@ -453,7 +454,18 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const handleFinish = () => {
       const minutes = totalFocusedSecondsRef.current / 60;
-      onComplete(Number(minutes.toFixed(1)), isTaskCompleted);
+      
+      // Calculate Average Session Score from segments
+      let avgScore = 100;
+      if (sessionHistoryRef.current.length > 0) {
+          const totalScore = sessionHistoryRef.current.reduce((acc, curr) => acc + curr.avgFocusScore, 0);
+          avgScore = Math.ceil(totalScore / sessionHistoryRef.current.length);
+      } else {
+          // Fallback if no segments recorded (extremely short session)
+          avgScore = Math.ceil(focusScore);
+      }
+      
+      onComplete(Number(minutes.toFixed(1)), isTaskCompleted, avgScore);
   };
 
   const skipBreak = () => {
