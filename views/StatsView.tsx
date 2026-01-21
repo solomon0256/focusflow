@@ -116,6 +116,56 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
       return ranks[index];
   };
 
+  // --- FOX AVATAR ASSETS & LOGIC (28 Levels) ---
+  // PLACEHOLDER: Once you have the images, fill this array with the URLs.
+  // Leave empty string '' to fallback to Emoji.
+  const FOX_ASSETS = [
+      '', // L1: Kindergarten
+      '', // L2: Elem 1st
+      '', // L3: Elem 2nd
+      '', // L4: Elem 3rd
+      '', // L5: Elem 4th
+      '', // L6: Elem 5th
+      '', // L7: Elem 6th
+      '', // L8: Middle 7th
+      '', // L9: Middle 8th
+      '', // L10: Middle 9th
+      '', // L11: High 10th
+      '', // L12: High 11th
+      '', // L13: High 12th
+      '', // L14: High Senior
+      '', // L15: College 1st
+      '', // L16: College 2nd
+      '', // L17: College 3rd
+      '', // L18: College 4th
+      '', // L19: Master 1st
+      '', // L20: Master 2nd
+      '', // L21: PhD Candidate
+      '', // L22: PhD Researcher
+      '', // L23: PhD Finalist
+      '', // L24: Postdoc
+      '', // L25: Asst Prof
+      '', // L26: Assoc Prof
+      '', // L27: Professor
+      '', // L28: Dean
+  ];
+
+  const getFoxAvatar = (level: number) => {
+      // Clamp level between 1 and 28
+      const safeLevel = Math.max(1, Math.min(level, 28));
+      const assetIndex = safeLevel - 1;
+      
+      const imageUrl = FOX_ASSETS[assetIndex];
+
+      if (imageUrl) {
+          return { type: 'img', val: imageUrl };
+      }
+
+      // FALLBACK: If no image provided yet, stick with Emoji but vary scale slightly
+      // Just to show *something* changes
+      return { type: 'emoji', val: '🦊', scale: 1.0 + (assetIndex * 0.02) }; 
+  };
+
   // --- COMPONENT: THE PURPLE PET CARD (Fox Left, Streak Right) ---
   const PetCard = () => {
     const streakDay = user?.pet.streakCount || 0;
@@ -127,6 +177,9 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
     const currentExp = user?.pet.currentExp || 0;
     const maxExp = user?.pet.maxExp || 100;
     const expPercent = Math.min(100, Math.max(0, (currentExp / maxExp) * 100));
+    
+    // Get Avatar Data
+    const avatar = getFoxAvatar(user?.pet.level || 1);
 
     return (
     <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl text-white overflow-hidden shadow-xl shadow-indigo-100 mb-4 relative z-0 group">
@@ -146,7 +199,9 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                 <div className="flex-1 ml-6">
                      <div className="flex justify-end items-center gap-2 mb-1">
                         <Trophy size={18} className="text-yellow-400 fill-yellow-400" />
-                        <span className="text-xl font-black text-white tracking-wide shadow-black drop-shadow-md">{getRankTitle(user?.pet.level || 1)}</span>
+                        <span className="text-xl font-black text-white tracking-wide shadow-black drop-shadow-md text-right leading-none">
+                            {getRankTitle(user?.pet.level || 1)}
+                        </span>
                      </div>
                      
                      {/* EXP Text */}
@@ -171,11 +226,28 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
             {/* 2. MAIN BODY: FOX (Left) - STREAK (Right) */}
             <div className="flex items-center justify-between mb-4">
                 
-                {/* LEFT: FOX */}
-                <div className="relative z-10 w-1/3 flex justify-center">
-                     <div className="text-8xl animate-bounce filter drop-shadow-2xl transform origin-center z-10 scale-110">🦊</div>
+                {/* LEFT: FOX AVATAR (Dynamic) */}
+                <div className="relative z-10 w-1/3 flex justify-center h-32 items-center">
                      {/* Glow behind fox */}
                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/20 rounded-full blur-3xl pointer-events-none z-0" />
+                     
+                     <motion.div 
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative z-10 filter drop-shadow-2xl"
+                     >
+                        {avatar.type === 'emoji' ? (
+                            <div className="text-8xl transform origin-center" style={{ transform: `scale(${avatar.scale})` }}>
+                                {avatar.val}
+                            </div>
+                        ) : (
+                            <img 
+                                src={avatar.val} 
+                                alt="Fox Avatar" 
+                                className="w-32 h-32 object-contain"
+                            />
+                        )}
+                     </motion.div>
                 </div>
 
                 {/* RIGHT: STREAK INFO */}
@@ -187,11 +259,15 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                             <Flame size={16} className="text-orange-300 fill-orange-300 animate-pulse" />
                             <span className="text-xs font-bold text-orange-200 uppercase tracking-wide">{t.streakTitle}</span>
                         </div>
-                        <div className="text-3xl font-black text-white leading-none mb-1">
-                            {streakDay} {t.streakDays}
-                        </div>
-                        <div className="inline-block bg-white/20 backdrop-blur-md px-2 py-0.5 rounded text-xs font-bold text-yellow-300 border border-white/10">
-                            EXP +{streakExp}
+                        
+                        {/* Custom Formatting: Day X Streak, EXP+Y */}
+                        <div className="text-right">
+                            <div className="text-3xl font-black text-white leading-none mb-1">
+                                {t.streakDetail.split(',')[0].replace('{n}', streakDay.toString())}
+                            </div>
+                            <div className="inline-block bg-white/20 backdrop-blur-md px-2 py-0.5 rounded text-xs font-bold text-yellow-300 border border-white/10">
+                                {t.streakDetail.split(',')[1].replace('{e}', streakExp.toString())}
+                            </div>
                         </div>
                     </div>
 
