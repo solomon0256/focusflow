@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Calendar as CalendarIcon, CheckCircle2, Circle, MoreHorizontal, Clock, Zap, Trash2, X, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -183,7 +184,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   // --- Calendar Logic ---
   const isSameDay = (d1: Date, d2: Date) => d1.toISOString().split('T')[0] === d2.toISOString().split('T')[0];
   
-  const generateCalendarGrid = (cursorDate: Date) => {
+  const generateCalendarGrid = (cursorDate: Date): (Date | null)[] => {
       const year = cursorDate.getFullYear();
       const month = cursorDate.getMonth();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -350,7 +351,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                         </div>
                                         {task.note && <p className="text-xs text-gray-400 mt-2 line-clamp-1">{task.note}</p>}
                                     </div>
-                                    <MoreHorizontal size={20} className="text-gray-300" />
+                                    < MoreHorizontal size={20} className="text-gray-300" />
                                 </div>
                             </motion.div>
                         ))}
@@ -447,7 +448,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                                     {['S','M','T','W','T','F','S'].map(d => <span key={d} className="text-[10px] text-gray-400 font-bold">{d}</span>)}
                                                 </div>
                                                 <div className="grid grid-cols-7 gap-1">
-                                                    {generateCalendarGrid(modalCalendarCursor).map((d, i) => {
+                                                    {/* FIX: Typed return from generateCalendarGrid correctly */}
+                                                    {generateCalendarGrid(modalCalendarCursor).map((d: Date | null, i: number) => {
                                                         if (!d) return <div key={i} />;
                                                         const isSelected = d.toISOString().split('T')[0] === formDate;
                                                         const isToday = isSameDay(d, new Date());

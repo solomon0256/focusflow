@@ -1,8 +1,8 @@
 # FocusFlow Project Status & Task Manifest
 
 **Date:** Current
-**Version:** 1.3.1 (Performance Update)
-**Status:** Feature Complete (Web), Pre-Native Migration
+**Version:** 1.4.0 (Pet & Gamification Phase)
+**Status:** Implementing Pet System v2
 
 ---
 
@@ -16,59 +16,39 @@
 ### B. Timer & Task System (计时与任务)
 *   **Smart Timer**: Pomodoro, Stopwatch, Custom modes with independent logic.
 *   **Task Management**: Full CRUD with priority and estimation.
-*   **Notifications**: Custom interval alerts setup (Data layer ready).
 
 ### C. AI Vision System (AI 视觉核心)
 *   **Tech Stack**: MediaPipe Tasks Vision (WASM).
-*   **Capabilities**: Real-time Face & Pose Detection.
-*   **Performance Engine (New v1.3.1)**: 
-    *   **Battery Saver Mode**: Dynamic resolution scaling (480p -> 360p) and frame throttling (5 FPS -> 2 FPS).
-    *   **Energy Impact**: Reduced power consumption by ~60%.
-
-### D. Analytics & Gamification (数据与游戏化)
-*   **Stats Dashboard**: 
-    *   Weekly activity bar charts.
-    *   **Timeline Visualization**: Scrollable, detailed breakdown of focus quality per session (Fixed in v1.3.1).
-*   **FocusFlow Lab**: Built-in stress testing tool to generate 100 days of mock data.
-*   **Debug Tools**: "Fast Forward" simulation logic fixed for accurate testing.
+*   **Performance Engine**: Battery Saver Mode (2-5 FPS switching).
 
 ---
 
 ## 2. 🚨 Critical Next Steps (当前关键任务)
 
-### A. Partner/Pet System (伙伴系统) - **Top Priority**
-*   **Goal**: Transform the static "FOX" icon into a living companion.
-*   **Requirements**:
-    *   **Visual Evolution**: Pet must change appearance based on Level (1-5).
-    *   **Animations**: Idle, Sleeping (when paused), Happy (when focused).
-    *   **Interaction**: Tap to feed/pet.
+### A. Partner/Pet System v2 (伙伴系统升级) - **ACTIVE**
+*   **Goal**: Create an Anime/2D mascot that motivates focus.
+*   **Streak Mechanics**: 
+    - [x] Implement Tier-based EXP (5, 10, 12, 15).
+    - [x] Implement "Soft Landing" degradation logic (Tier 4 -> Tier 2).
+*   **Visual Evolution**: 
+    - [ ] Design/Integrate 2D Fox assets for different tiers.
+    - [ ] Level-up Modal with "evolution" animation.
 
 ### B. Advanced AI Heuristics (深度 AI 逻辑)
-*   **Context**: Moving beyond simple Yaw/Pitch thresholds.
-*   **Tasks**:
-    1.  **Posture Analysis**: Calculate "Spine Angle" to detect slouching/hunching.
-    2.  **Fatigue Detection**: Track blink rate or "head drooping" duration.
-    3.  **State Machine**: Refine the 4-stage flow (`Deep Flow` vs `Wandering`).
+*   **Posture Analysis**: Calculate "Spine Angle" to detect slouching (Pro feature).
+*   **Fatigue Detection**: Track eye-closure events over 1.5s.
 
 ### C. Native Migration (原生化迁移)
 *   **Goal**: Convert Web App to `.ipa` / `.apk`.
-*   **Tasks**:
-    1.  Install Capacitor 5.
-    2.  **Background Timer**: Implement `@capacitor/local-notifications` to ring when timer ends in background.
-    3.  **Permissions**: Configure `App Transport Security` (iOS) for camera.
+*   **Task**: Capacitor setup and Local Notifications integration.
 
 ---
 
-## 3. Architecture Notes (架构备注)
-
-*   **Zero-Cost Philosophy**: No external DB.
-*   **File Structure**:
-    *   `components/`: Reusable UI.
-    *   `services/`: Singleton logic (NativeService).
-    *   `views/`: Full-screen pages.
-*   **Performance**: AI loop is now decoupled from UI rendering to ensure 60fps animations even during heavy inference.
+## 3. Version History
+*   **1.3.1**: Performance & Bug Fixes (Timeline Chart).
+*   **1.4.0**: New Pet Logic (Streaks & Tiers).
 
 ---
 
 **Signed off by:** Lead Engineer
-**Version:** 1.3.1
+**Version:** 1.4.0

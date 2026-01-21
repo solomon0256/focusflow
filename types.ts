@@ -1,4 +1,3 @@
-
 export enum TimerMode {
   POMODORO = 'POMODORO',
   STOPWATCH = 'STOPWATCH',
@@ -57,6 +56,7 @@ export interface PetState {
     currentExp: number;
     maxExp: number;
     happiness: number;
+    streakCount: number; // Added: Continuous days tracker
     lastDailyActivityDate: string; // YYYY-MM-DD
 }
 
