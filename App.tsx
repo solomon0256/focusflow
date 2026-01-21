@@ -51,6 +51,9 @@ function App() {
             if (savedUser) {
                 if (!savedUser.pet) {
                     savedUser.pet = { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' };
+                } else if (savedUser.pet.streakCount === undefined) {
+                    // Runtime migration: Ensure streakCount exists for legacy users
+                    savedUser.pet.streakCount = 0;
                 }
                 setUser(savedUser);
             } else {

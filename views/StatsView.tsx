@@ -1,9 +1,9 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, Cell, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IOSCard } from '../components/IOSComponents';
-import { Award, Zap, Clock, CheckCircle2, ChevronDown, ChevronUp, Brain, TrendingUp, Flame, Star, TestTube2, LogIn, Trophy } from 'lucide-react';
+import { Award, Zap, Clock, CheckCircle2, ChevronDown, ChevronUp, TrendingUp, Star, TestTube2, LogIn, Trophy } from 'lucide-react';
 import { Task, FocusRecord, Settings, User } from '../types';
 import { translations } from '../utils/translations';
 import { NativeService } from '../services/native';
@@ -20,8 +20,9 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
   const t = translations[settings.language].stats;
   const [isPetExpanded, setIsPetExpanded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
   
+  // IsMounted check to prevent hydration issues with Charts
+  const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     NativeService.Storage.get<User>('focusflow_user').then(u => setUser(u));
     setIsMounted(true);
@@ -69,10 +70,14 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
   };
 
   const PetCard = () => (
-    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl text-white overflow-hidden shadow-xl shadow-indigo-100 mb-4 relative z-0">
+    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl text-white overflow-hidden shadow-xl shadow-indigo-100 mb-4 relative z-0 group">
+        
+        {/* Shimmer Effect */}
+        <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none z-10" />
+
         <div className="p-6 relative z-10 cursor-pointer" onClick={() => setIsPetExpanded(!isPetExpanded)}>
             
-            {/* RANK BADGE - TOP CENTER (ALWAYS VISIBLE) */}
+            {/* RANK BADGE - TOP CENTER (Restored) */}
             <div className="flex justify-center mb-6">
                 <motion.div 
                     initial={{ y: -5, opacity: 0 }} animate={{ y: 0, opacity: 1 }}

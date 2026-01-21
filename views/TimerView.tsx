@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw, Plus, Bell } from 'lucide-react';
@@ -404,12 +405,17 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                 </button>
             </div>
 
-            <div className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 text-gray-500 flex items-center gap-2`}>
+            {/* STATUS BADGE - BREATHING ANIMATION ADDED */}
+            <motion.div 
+                animate={{ boxShadow: ["0 0 0px rgba(59, 130, 246, 0)", "0 0 10px rgba(59, 130, 246, 0.3)", "0 0 0px rgba(59, 130, 246, 0)"] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 text-gray-500 flex items-center gap-2`}
+            >
                 <Brain size={12} className="text-blue-500"/>
                 <span>{t.ready}</span>
-            </div>
+            </motion.div>
             
-            <div className="text-[18vw] font-thin font-mono tracking-tighter tabular-nums text-gray-900 leading-none drop-shadow-sm z-10">
+            <div className="text-[18vw] font-thin font-mono tracking-tighter tabular-nums text-gray-900 leading-none drop-shadow-sm z-10 select-none">
                 {formatTime(displayTime)}
             </div>
         </div>

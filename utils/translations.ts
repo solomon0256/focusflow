@@ -3,6 +3,7 @@ import { LanguageCode } from '../types';
 
 type TranslationKeys = typeof en;
 
+// 1. ENGLISH (Source of Truth)
 const en = {
   common: { confirm: 'Confirm', cancel: 'Cancel', back: 'Back', save: 'Save', delete: 'Delete', loading: 'Loading...' },
   nav: { timer: 'Timer', tasks: 'Tasks', stats: 'Stats', settings: 'Settings' },
@@ -44,6 +45,7 @@ const en = {
   session: { complete: 'Done!', focusedFor: 'Focused for', minutes: 'min', avgFocus: 'Avg', posture: 'Posture', timeline: 'Timeline', cycleLog: 'Log', backHome: 'Home', recharge: 'Recharge', rest: 'Rest', breathe: 'Breathe', skipBreak: 'Skip', paused: 'Paused', focusGuard: 'Guard', proPosture: 'Posture', fullBodyAi: 'Full AI', focusTime: 'Focus', taskCompleted: 'Done', markAsDone: 'Mark done?', sessionDoneAuto: 'Auto-saved', sessionDoneManual: 'Save?', earlyStop: 'Stopped' }
 };
 
+// 2. SIMPLIFIED CHINESE
 const zh = {
   common: { confirm: '确认', cancel: '取消', back: '返回', save: '保存', delete: '删除', loading: '加载中...' },
   nav: { timer: '计时', tasks: '任务', stats: '统计', settings: '设置' },
@@ -85,6 +87,7 @@ const zh = {
   session: { complete: '专注完成！', focusedFor: '你保持专注了', minutes: '分钟', avgFocus: '平均度', posture: '体态', timeline: '时间轴', cycleLog: '日志', backHome: '返回主页', recharge: '充电中', rest: '休息时间', breathe: '深呼吸', skipBreak: '跳过', paused: '已暂停', focusGuard: '卫士', proPosture: '体态', fullBodyAi: '全身 AI', focusTime: '专注', taskCompleted: '任务完成', markAsDone: '标记完成？', sessionDoneAuto: '自动保存', sessionDoneManual: '保存结果？', earlyStop: '提前结束' }
 };
 
+// 3. KOREAN (Missing keys fixed)
 const ko = {
   common: { confirm: '확인', cancel: '취소', back: '뒤로', save: '저장', delete: '삭제', loading: '로딩 중...' },
   nav: { timer: '타이머', tasks: '작업', stats: '통계', settings: '설정' },
@@ -137,7 +140,7 @@ export const translations: Record<LanguageCode, TranslationKeys> = {
   ru: { ...en, common: { ...en.common, confirm: 'Подтвердить', cancel: 'Отмена', back: 'Назад' }, nav: { timer: 'Таймер', tasks: 'Задачи', stats: 'Статистика', settings: 'Настройки' } },
   ar: { ...en, common: { ...en.common, confirm: 'تأكيد', cancel: 'إلغاء', back: 'رجوع' }, nav: { timer: 'المؤقت', tasks: 'المهام', stats: 'الإحصائيات', settings: 'الإعدادات' } },
   de: { ...en, common: { ...en.common, confirm: 'Bestätigen', cancel: 'Abbrechen', back: 'Zurück' }, nav: { timer: 'Timer', tasks: 'Aufgaben', stats: 'Statistiken', settings: 'Einstellungen' } },
-  hi: { ...en, common: { ...en.common, confirm: 'पुष्टि करें', cancel: 'رद्द करें', back: 'पीछे' }, nav: { timer: 'タイマー', tasks: 'कार्य', stats: 'आंकड़े', settings: 'सेटिंग्स' } }
+  hi: { ...en, common: { ...en.common, confirm: 'पुष्टि करें', cancel: 'رद्द करें', back: 'पीछे' }, nav: { timer: 'टाइ머', tasks: 'कार्य', stats: 'आंकड़े', settings: 'सेटिंग्स' } }
 };
 
 export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
