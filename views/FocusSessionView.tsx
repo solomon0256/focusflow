@@ -17,15 +17,13 @@ interface FocusSessionViewProps {
   onComplete: (minutesFocused: number, taskCompleted?: boolean, avgScore?: number) => void;
   onCancel: () => void;
   onUpgradeTrigger: () => void;
+  // NEW: Callback to notify parent of phase change
+  onPhaseChange?: (phase: 'IDLE' | 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK') => void;
 }
 
 // --- CONFIGURATION ---
-// STANDARD: 200ms = 5 FPS (Balanced)
-// SAVER: 500ms = 2 FPS (Eco)
 const INTERVAL_BALANCED = 200;
 const INTERVAL_SAVER = 500;
-
-// --- ASSETS ---
 const CDN_WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm";
 const CDN_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
@@ -33,9 +31,9 @@ type SessionState = 'INIT' | 'COUNTDOWN' | 'CALIBRATING' | 'ACTIVE' | 'SUMMARY' 
 type Phase = 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK';
 
 interface TimelineSegment {
-    score: number;      // 0-100
-    duration: number;   // minutes (formatted, e.g. 5 or 2.5)
-    isPartial: boolean; // true if < 5 mins
+    score: number;      
+    duration: number;   
+    isPartial: boolean; 
 }
 
 interface SessionSegmentLog {
@@ -51,7 +49,6 @@ interface SessionSegmentLog {
 }
 
 // Helper to format minutes into "1h 30m" or "45m"
-// FIXED: Better precision for short durations
 const formatMinutes = (m: number) => {
     if (m > 0 && m < 1) return '<1m';
     const totalMin = Math.round(m);
@@ -62,46 +59,42 @@ const formatMinutes = (m: number) => {
     return `${h}h ${min}m`;
 };
 
-const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, task, user, onComplete, onCancel, onUpgradeTrigger }) => {
+const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, task, user, onComplete, onCancel, onUpgradeTrigger, onPhaseChange }) => {
   const t = translations[settings.language].session;
   
-  // Determine Detection Interval & Resolution Target
   const detectionInterval = settings.batterySaverMode ? INTERVAL_SAVER : INTERVAL_BALANCED;
   const targetResolution = settings.batterySaverMode ? { width: 480, height: 360 } : { width: 640, height: 480 };
 
-  // --- UI States ---
   const [sessionState, setSessionState] = useState<SessionState>('INIT');
   const [phase, setPhase] = useState<Phase>('WORK');
   const [roundsCompleted, setRoundsCompleted] = useState(0);
 
+  // Sync phase to parent
+  useEffect(() => {
+      onPhaseChange?.(phase);
+  }, [phase, onPhaseChange]);
+
+  // --- TIMER STATE (Drift-Proof) ---
   const [timeLeft, setTimeLeft] = useState(initialTimeInSeconds);
   const [isPaused, setIsPaused] = useState(false);
   
-  // Notification Toast State
+  // Timer Refs for accurate calculation
+  const sessionEndTimeRef = useRef<number>(0);
+  const pauseStartTimeRef = useRef<number>(0);
+  
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
-
-  // Summary Screen State
   const [isTaskCompleted, setIsTaskCompleted] = useState(false);
   const [didFinishNaturally, setDidFinishNaturally] = useState(false);
 
   // Stats Accumulator
   const totalFocusedSecondsRef = useRef(0);
-  const currentCycleElapsedRef = useRef(0); // Track time in current phase for accurate stats
+  const currentCycleElapsedRef = useRef(0); 
   const sessionHistoryRef = useRef<SessionSegmentLog[]>([]);
-  
-  // [TODO: AI_CONNECTION] Live accumulator for the current running session
-  const currentSegmentMetrics = useRef({
-      distractions: 0,
-      postureIssues: 0,
-      fatigueEvents: 0,
-  });
+  const currentSegmentMetrics = useRef({ distractions: 0, postureIssues: 0, fatigueEvents: 0 });
 
-  // Countdown
   const [countdown, setCountdown] = useState(3);
-  
   const isPremium = user?.isPremium || false;
 
-  // AI & Feedback States
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isAiDisabled, setIsAiDisabled] = useState(false); 
   const [loadingStatus, setLoadingStatus] = useState<string>('Initializing Engine...');
@@ -109,7 +102,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const [showCameraPreview, setShowCameraPreview] = useState(true);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  // AI Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null); 
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
@@ -117,21 +109,15 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const lastVideoTimeRef = useRef<number>(-1);
   const drawingUtilsRef = useRef<DrawingUtils | null>(null); 
 
-  // FPS & Smoothing
   const lastFrameTimeRef = useRef<number>(0);
   const lastPredictionTimeRef = useRef<number>(0);
   const fpsRef = useRef<number>(0);
   const smoothYawRef = useRef<number>(0); 
-  const calibrationRef = useRef<{
-      noseBase: { x: number, y: number } | null;
-      shoulderWidthBase: number | null;
-  }>({ noseBase: null, shoulderWidthBase: null });
+  const calibrationRef = useRef<{ noseBase: { x: number, y: number } | null; shoulderWidthBase: number | null; }>({ noseBase: null, shoulderWidthBase: null });
 
-  // Real-time State
   const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
   const [focusScore, setFocusScore] = useState(100); 
 
-  // --- Notification Data Preparation ---
   const activeNotifications = useMemo(() => {
       if (mode === TimerMode.POMODORO) return settings.notifications || [];
       if (mode === TimerMode.CUSTOM) return settings.customNotifications || [];
@@ -140,44 +126,30 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   }, [mode, settings]);
 
   const targetRounds = useMemo(() => {
-      if (mode === TimerMode.POMODORO && task?.pomodoroCount) {
-          return task.pomodoroCount;
-      }
+      if (mode === TimerMode.POMODORO && task?.pomodoroCount) return task.pomodoroCount;
       return settings.pomodorosPerRound;
   }, [mode, task, settings.pomodorosPerRound]);
 
-  // 0. Wake Lock
   useEffect(() => {
       NativeService.Screen.keepAwake();
       return () => { NativeService.Screen.allowSleep(); };
   }, []);
 
-  // 1. Initialization Pipeline
+  // 1. Init Pipeline (Unchanged)
   useEffect(() => {
     let stream: MediaStream | null = null;
     let isMounted = true;
-
     const setupPipeline = async () => {
         try {
             setLoadingStatus('Accessing Camera...');
             await new Promise(r => setTimeout(r, 500)); 
-
-            // DYNAMIC RESOLUTION BASED ON BATTERY MODE
             stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'user', 
-                    width: { ideal: targetResolution.width }, 
-                    height: { ideal: targetResolution.height }, 
-                    frameRate: { ideal: 30 } // Keep HW fps high for exposure
-                },
+                video: { facingMode: 'user', width: { ideal: targetResolution.width }, height: { ideal: targetResolution.height }, frameRate: { ideal: 30 } },
                 audio: false
             });
-
             if (videoRef.current) videoRef.current.srcObject = stream;
-
             setLoadingStatus('Loading Neural Network...');
             const vision = await FilesetResolver.forVisionTasks(CDN_WASM_URL);
-            
             poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(vision, {
                 baseOptions: { modelAssetPath: CDN_MODEL_URL, delegate: "GPU" },
                 runningMode: "VIDEO",
@@ -186,14 +158,11 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                 minPosePresenceConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
-
             if (canvasRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
                 if (ctx) drawingUtilsRef.current = new DrawingUtils(ctx);
             }
-
             if (isMounted) setSessionState('COUNTDOWN');
-
         } catch (err: any) {
             console.error("Init Error:", err);
             if (isMounted) {
@@ -203,9 +172,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
             }
         }
     };
-
     setupPipeline();
-
     return () => {
         isMounted = false;
         if (stream) stream.getTracks().forEach(track => track.stop());
@@ -235,7 +202,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const performCalibration = () => {
       const landmarker = poseLandmarkerRef.current;
       const video = videoRef.current;
-      
       if (landmarker && video && video.readyState >= 2) {
           const result = landmarker.detectForVideo(video, performance.now());
           if (result.landmarks && result.landmarks.length > 0) {
@@ -246,18 +212,23 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               };
           }
       }
+      
+      // START TIMER LOGIC HERE
+      const startDuration = initialTimeInSeconds;
+      setTimeLeft(startDuration);
+      sessionEndTimeRef.current = Date.now() + (startDuration * 1000);
+      
       setSessionState('ACTIVE');
       NativeService.Haptics.notificationSuccess();
   };
 
-  // 3. AI Loop
+  // 3. AI Loop (Unchanged)
   useEffect(() => {
       if (sessionState === 'ACTIVE' && phase === 'WORK' && !isAiDisabled && !isPaused) {
           const predictWebcam = () => {
               const video = videoRef.current;
               const landmarker = poseLandmarkerRef.current;
               const canvas = canvasRef.current;
-              
               if (video && landmarker && !video.paused && !video.ended && isVideoReady) {
                   const now = performance.now();
                   if (now - lastPredictionTimeRef.current >= detectionInterval) {
@@ -265,7 +236,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                       if (delta > 0) fpsRef.current = 1000 / delta; 
                       lastFrameTimeRef.current = now;
                       lastPredictionTimeRef.current = now;
-
                       if (video.currentTime !== lastVideoTimeRef.current) {
                           lastVideoTimeRef.current = video.currentTime;
                           try {
@@ -282,33 +252,22 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       return () => cancelAnimationFrame(requestRef.current);
   }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase, detectionInterval]); 
 
-  // --- LOGIC: Record Stats ---
+  // --- STATS LOGIC ---
   const recordCycleStats = (durationMinutes: number) => {
       const totalSeconds = Math.floor(durationMinutes * 60);
       const timelineSegments: TimelineSegment[] = [];
       let secondsProcessed = 0;
-      
       while (secondsProcessed < totalSeconds) {
           const secondsLeft = totalSeconds - secondsProcessed;
-          const chunkSeconds = Math.min(300, secondsLeft); // Max 5 mins
-          
+          const chunkSeconds = Math.min(300, secondsLeft); 
           let chunkMinutes = Number((chunkSeconds / 60).toFixed(1));
           if (chunkMinutes === 0 && chunkSeconds > 0) chunkMinutes = 0.1;
-          
           const variance = Math.floor(Math.random() * 8) - 4;
           const segScore = Math.max(0, Math.min(100, focusScore + variance));
-
-          timelineSegments.push({
-               score: segScore,
-               duration: chunkMinutes,
-               isPartial: chunkSeconds < 300
-          });
-          
+          timelineSegments.push({ score: segScore, duration: chunkMinutes, isPartial: chunkSeconds < 300 });
           secondsProcessed += chunkSeconds;
       }
-
       const formattedTotalMinutes = Number((totalSeconds / 60).toFixed(1));
-
       const log: SessionSegmentLog = {
           id: Date.now(),
           startTime: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
@@ -320,97 +279,151 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           postureQuality: currentSegmentMetrics.current.postureIssues > 2 ? 'Slouching' : 'Good',
           eyeFatigueLevel: 'Low'
       };
-
       sessionHistoryRef.current.push(log);
-      
-      currentSegmentMetrics.current = {
-          distractions: 0,
-          postureIssues: 0,
-          fatigueEvents: 0,
-      };
+      currentSegmentMetrics.current = { distractions: 0, postureIssues: 0, fatigueEvents: 0 };
   };
 
-  // 4. Timer Logic
+  // --- STRICT MODE: AUTO PAUSE ON BACKGROUND ---
   useEffect(() => {
-      if (sessionState !== 'ACTIVE' || isPaused) return;
+      const handleVisibilityChange = () => {
+          if (document.hidden) {
+              // APP WENT TO BACKGROUND
+              if (sessionState === 'ACTIVE' && !isPaused) {
+                  // Explicitly set paused state directly here
+                  pauseStartTimeRef.current = Date.now();
+                  setIsPaused(true);
+                  NativeService.Haptics.impactMedium();
+              }
+          } else {
+              // APP CAME TO FOREGROUND
+              // If we find it paused, and it was caused by this logic, show the message
+              if (sessionState === 'ACTIVE' && isPaused) {
+                  const autoPauseMsg = settings.language === 'zh' ? '⛔ 离开应用自动暂停' : '⛔ Auto-paused on exit';
+                  setNotificationMsg(autoPauseMsg);
+                  setTimeout(() => setNotificationMsg(null), 4000);
+              }
+          }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [sessionState, isPaused, settings.language]);
+
+  // 4. ROBUST TIMER LOGIC (Fixes Drift)
+  useEffect(() => {
+      if (sessionState !== 'ACTIVE') return;
 
       const interval = setInterval(() => {
-          setTimeLeft((prev) => {
-              if (phase === 'WORK') {
-                  totalFocusedSecondsRef.current += 1;
-                  currentCycleElapsedRef.current += 1;
-                  
-                  const elapsedSeconds = totalFocusedSecondsRef.current;
-                  if (elapsedSeconds % 60 === 0) {
-                      const elapsedMinutes = elapsedSeconds / 60;
-                      if (activeNotifications.includes(elapsedMinutes)) {
-                          NativeService.Haptics.notificationSuccess();
-                          setNotificationMsg(`${elapsedMinutes} minutes reached`);
-                          setTimeout(() => setNotificationMsg(null), 3000);
-                      }
-                  }
-              }
+          if (isPaused) return;
 
-              if (mode === TimerMode.STOPWATCH) {
-                  return prev + 1;
-              }
-
-              if (prev <= 1) {
+          // STOPWATCH MODE: Increment
+          if (mode === TimerMode.STOPWATCH) {
+              setTimeLeft(prev => {
+                  const newVal = prev + 1;
+                  // Stats accumulator
                   if (phase === 'WORK') {
-                      const elapsedMins = currentCycleElapsedRef.current / 60;
-                      recordCycleStats(elapsedMins); 
-                      currentCycleElapsedRef.current = 0; 
-
-                      const newRounds = roundsCompleted + 1;
-                      setRoundsCompleted(newRounds);
-                      NativeService.Haptics.notificationSuccess();
-
-                      if (mode === TimerMode.POMODORO && newRounds < targetRounds) {
-                          setPhase('SHORT_BREAK');
-                          return settings.shortBreakTime * 60;
-                      } else if (mode === TimerMode.POMODORO && newRounds >= targetRounds) {
-                          setPhase('LONG_BREAK');
-                          return settings.longBreakTime * 60;
-                      } else {
-                          clearInterval(interval);
-                          handleShowSummary(true); 
-                          return 0;
-                      }
-                  } 
-                  else if (phase === 'SHORT_BREAK') {
-                      NativeService.Haptics.notificationSuccess();
-                      setPhase('WORK');
-                      currentCycleElapsedRef.current = 0;
-                      return settings.workTime * 60;
+                      totalFocusedSecondsRef.current++;
+                      currentCycleElapsedRef.current++;
                   }
-                  else if (phase === 'LONG_BREAK') {
+                  return newVal;
+              });
+              return;
+          }
+
+          // COUNTDOWN MODE: Calculate based on End Time
+          const now = Date.now();
+          const remainingMs = sessionEndTimeRef.current - now;
+          const remainingSec = Math.ceil(remainingMs / 1000);
+
+          // Update Stats Accumulators (Approximate 1s tick)
+          // Note: Since we use Delta Time for the main timer, stats might slightly drift but it's acceptable for charts.
+          // For strict accuracy, we'd calculate diff since last tick.
+          if (phase === 'WORK' && remainingSec > 0) {
+              totalFocusedSecondsRef.current++;
+              currentCycleElapsedRef.current++;
+              
+              // Notification Check
+              const elapsedSeconds = totalFocusedSecondsRef.current;
+              if (elapsedSeconds % 60 === 0) {
+                  const elapsedMinutes = elapsedSeconds / 60;
+                  if (activeNotifications.includes(elapsedMinutes)) {
+                      NativeService.Haptics.notificationSuccess();
+                      setNotificationMsg(`${elapsedMinutes} minutes reached`);
+                      setTimeout(() => setNotificationMsg(null), 3000);
+                  }
+              }
+          }
+
+          if (remainingSec <= 0) {
+              setTimeLeft(0);
+              // TIMER END LOGIC
+              if (phase === 'WORK') {
+                  const elapsedMins = currentCycleElapsedRef.current / 60;
+                  recordCycleStats(elapsedMins); 
+                  currentCycleElapsedRef.current = 0; 
+
+                  const newRounds = roundsCompleted + 1;
+                  setRoundsCompleted(newRounds);
+                  NativeService.Haptics.notificationSuccess();
+
+                  if (mode === TimerMode.POMODORO && newRounds < targetRounds) {
+                      setPhase('SHORT_BREAK');
+                      const breakSec = settings.shortBreakTime * 60;
+                      setTimeLeft(breakSec);
+                      sessionEndTimeRef.current = Date.now() + (breakSec * 1000);
+                  } else if (mode === TimerMode.POMODORO && newRounds >= targetRounds) {
+                      setPhase('LONG_BREAK');
+                      const breakSec = settings.longBreakTime * 60;
+                      setTimeLeft(breakSec);
+                      sessionEndTimeRef.current = Date.now() + (breakSec * 1000);
+                  } else {
                       clearInterval(interval);
                       handleShowSummary(true); 
-                      return 0;
                   }
-                  return 0;
+              } 
+              else if (phase === 'SHORT_BREAK') {
+                  NativeService.Haptics.notificationSuccess();
+                  setPhase('WORK');
+                  currentCycleElapsedRef.current = 0;
+                  const workSec = settings.workTime * 60;
+                  setTimeLeft(workSec);
+                  sessionEndTimeRef.current = Date.now() + (workSec * 1000);
               }
-              return prev - 1;
-          });
+              else if (phase === 'LONG_BREAK') {
+                  clearInterval(interval);
+                  handleShowSummary(true); 
+              }
+          } else {
+              setTimeLeft(remainingSec);
+          }
       }, 1000);
+
       return () => clearInterval(interval);
   }, [sessionState, isPaused, phase, roundsCompleted, settings, mode, activeNotifications, targetRounds]);
+
+  const handlePauseToggle = () => {
+      NativeService.Haptics.impactMedium();
+      if (isPaused) {
+          // RESUME
+          const now = Date.now();
+          const pausedDuration = now - pauseStartTimeRef.current;
+          sessionEndTimeRef.current += pausedDuration; // Push end time forward by pause duration
+          setIsPaused(false);
+      } else {
+          // PAUSE
+          pauseStartTimeRef.current = Date.now();
+          setIsPaused(true);
+      }
+  };
 
   const handleShowSummary = (naturalFinish: boolean = false) => {
       if (mode === TimerMode.STOPWATCH || !naturalFinish) {
            const elapsedMins = currentCycleElapsedRef.current / 60;
-           if (elapsedMins > 0.05) { 
-               recordCycleStats(elapsedMins);
-           }
+           if (elapsedMins > 0.05) recordCycleStats(elapsedMins);
       }
-
       setDidFinishNaturally(naturalFinish);
-      if (mode === TimerMode.POMODORO && naturalFinish) {
-          setIsTaskCompleted(true);
-      } else {
-          setIsTaskCompleted(false);
-      }
-
+      if (mode === TimerMode.POMODORO && naturalFinish) setIsTaskCompleted(true);
+      else setIsTaskCompleted(false);
       setSessionState('SUMMARY');
       NativeService.Haptics.notificationSuccess();
   };
@@ -431,13 +444,16 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       if (phase === 'SHORT_BREAK') {
           setPhase('WORK');
           currentCycleElapsedRef.current = 0;
-          setTimeLeft(settings.workTime * 60);
+          const workSec = settings.workTime * 60;
+          setTimeLeft(workSec);
+          sessionEndTimeRef.current = Date.now() + (workSec * 1000);
           NativeService.Haptics.impactMedium();
       } else if (phase === 'LONG_BREAK') {
           handleShowSummary(true);
       }
   };
 
+  // DEBUG: Fast Forward needs to adjust End Time ref now
   const handleDebugFastForward = () => {
       if (phase === 'WORK') {
           const SKIP_MINUTES = 30;
@@ -447,16 +463,18 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           
           if (mode === TimerMode.POMODORO || mode === TimerMode.CUSTOM) {
               if (timeLeft > SKIP_SECONDS) {
-                  setTimeLeft(prev => prev - SKIP_SECONDS);
+                  sessionEndTimeRef.current -= (SKIP_SECONDS * 1000);
                   setNotificationMsg(`⚡ Debug: Skipped ${SKIP_MINUTES}m`);
               } else {
+                  // Instant Finish
                   const remainingMins = timeLeft / 60;
                   recordCycleStats(remainingMins);
                   totalFocusedSecondsRef.current += timeLeft;
-                  setTimeLeft(1); 
+                  sessionEndTimeRef.current = Date.now() - 1000; // Force end
                   setNotificationMsg("⚡ Debug: Finishing...");
               }
           } else {
+              // Stopwatch
               setTimeLeft(prev => prev + SKIP_SECONDS);
               setNotificationMsg(`⚡ Debug: Added ${SKIP_MINUTES}m`);
           }
@@ -938,7 +956,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         </span>
                         {isPaused ? (
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="bg-black/50 backdrop-blur-sm px-4 py-1 rounded text-sm font-bold tracking-widest uppercase border border-white/20">{t.paused}</div>
+                                <button onClick={handlePauseToggle} className="bg-black/50 backdrop-blur-sm px-4 py-1 rounded text-sm font-bold tracking-widest uppercase border border-white/20 cursor-pointer">{t.paused}</button>
                             </div>
                         ) : (
                              mode === TimerMode.POMODORO && (
@@ -959,7 +977,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                             <Square size={24} fill="currentColor" />
                         </button>
                         <button 
-                            onClick={() => { setIsPaused(!isPaused); NativeService.Haptics.impactMedium(); }}
+                            onClick={handlePauseToggle}
                             className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center shadow-2xl active:scale-95 transition-transform"
                         >
                             {isPaused ? <Play size={32} fill="black" className="ml-1" /> : <Pause size={32} fill="black" />}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
 import TasksView from './views/TasksView';
@@ -8,6 +8,7 @@ import SettingsView from './views/SettingsView';
 import FocusSessionView from './views/FocusSessionView';
 import { Task, Settings, Priority, FocusRecord, TimerMode, User, LanguageCode } from './types';
 import { NativeService } from './services/native';
+import { AudioService } from './services/audio'; // Import Audio Service
 import { Zap } from 'lucide-react';
 
 const STORAGE_KEYS = {
@@ -17,9 +18,23 @@ const STORAGE_KEYS = {
     USER: 'focusflow_user'
 };
 
+// --- HELPER: Get Local YYYY-MM-DD ---
+// Fixes the UTC timezone bug where tasks appeared on wrong days
+export const getLocalDateString = (date: Date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('timer');
   const [isFocusSessionActive, setIsFocusSessionActive] = useState(false);
+  
+  // Track Session Phase for Audio Logic
+  // 'IDLE' | 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK'
+  const [sessionPhase, setSessionPhase] = useState<'IDLE' | 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK'>('IDLE');
+
   const [isAppReady, setIsAppReady] = useState(false);
   const [currentSessionParams, setCurrentSessionParams] = useState<{
       mode: TimerMode;
@@ -31,7 +46,7 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusRecord[]>([]);
   
-  // Default language logic: ALWAYS default to 'en' unless a supported language is explicitly saved
+  // Default settings with AUDIO
   const [settings, setSettings] = useState<Settings>({
       workTime: 25, 
       shortBreakTime: 5, 
@@ -41,7 +56,12 @@ function App() {
       customNotifications: [],
       stopwatchNotifications: [],
       language: 'en', // Strict default
-      batterySaverMode: false
+      batterySaverMode: false,
+      // Audio Defaults
+      soundEnabled: false,
+      soundMode: 'timer',
+      selectedSoundId: 'none',
+      soundVolume: 0.5
   });
 
   useEffect(() => {
@@ -52,7 +72,6 @@ function App() {
                 if (!savedUser.pet) {
                     savedUser.pet = { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' };
                 } else if (savedUser.pet.streakCount === undefined) {
-                    // Runtime migration: Ensure streakCount exists for legacy users
                     savedUser.pet.streakCount = 0;
                 }
                 setUser(savedUser);
@@ -68,18 +87,18 @@ function App() {
             
             const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
             if (savedSettings) {
-                // Ensure language is one of the supported codes, else fallback to 'en'
                 const supportedCodes: LanguageCode[] = ['en', 'zh', 'zh-TW', 'fr', 'ja', 'ko', 'es', 'ru', 'ar', 'de', 'hi'];
                 if (!supportedCodes.includes(savedSettings.language)) {
                     savedSettings.language = 'en';
                 }
-                setSettings(savedSettings);
+                // Merge in case new settings (like audio) are missing from saved data
+                setSettings(prev => ({ ...prev, ...savedSettings }));
             }
 
             const savedTasks = await NativeService.Storage.get<Task[]>(STORAGE_KEYS.TASKS);
             if (savedTasks) setTasks(savedTasks);
             else {
-                 const today = new Date().toISOString().split('T')[0];
+                 const today = getLocalDateString();
                  setTasks([{ id: '1', title: 'Welcome to FocusFlow', date: today, time: '09:00', durationMinutes: 25, priority: Priority.HIGH, completed: false, pomodoroCount: 1, note: 'This is a local-first app.' }]);
             }
             const savedHistory = await NativeService.Storage.get<FocusRecord[]>(STORAGE_KEYS.HISTORY);
@@ -95,10 +114,44 @@ function App() {
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
   useEffect(() => { if(isAppReady && user) NativeService.Storage.set(STORAGE_KEYS.USER, user); }, [user, isAppReady]);
 
+  // --- AUDIO LOGIC ORCHESTRATOR ---
+  useEffect(() => {
+      if (!isAppReady) return;
+
+      AudioService.setVolume(settings.soundVolume);
+
+      // 1. ALWAYS ON Mode
+      if (settings.soundEnabled && settings.soundMode === 'always') {
+          // Play immediately if id is valid
+          // If browser blocks autoplay, this might fail until first interaction, but we try.
+          AudioService.play(settings.selectedSoundId);
+          // If user switches visibility (background), AudioService handles mute inside itself (via visibilitychange).
+          // But here we ensure that if we return from background, we check this logic again.
+          if (!document.hidden) AudioService.resume(); 
+      }
+      
+      // 2. TIMER ONLY Mode
+      else if (settings.soundEnabled && settings.soundMode === 'timer') {
+          if (isFocusSessionActive && sessionPhase === 'WORK') {
+              AudioService.play(settings.selectedSoundId);
+          } else {
+              // Pause if break or idle
+              AudioService.pause();
+          }
+      }
+      
+      // 3. DISABLED
+      else {
+          AudioService.stop();
+      }
+
+  }, [settings.soundEnabled, settings.soundMode, settings.selectedSoundId, settings.soundVolume, isFocusSessionActive, sessionPhase, isAppReady]);
+
+
   const addFocusRecord = (minutes: number, mode: TimerMode, date?: string, score?: number) => {
       const newRecord: FocusRecord = {
           id: Date.now().toString() + Math.random(),
-          date: date || new Date().toISOString().split('T')[0],
+          date: date || getLocalDateString(),
           durationMinutes: minutes,
           mode: mode,
           score: score || 100
@@ -123,7 +176,7 @@ function App() {
       const lastActivityStr = pet.lastDailyActivityDate;
       
       let newStreak = pet.streakCount;
-      let streakExp = 0; // STREAK EXP IS NOT MULTIPLIED
+      let streakExp = 0;
 
       if (lastActivityStr !== dateStr) {
           if (lastActivityStr) {
@@ -141,30 +194,21 @@ function App() {
           } else {
               newStreak = 1;
           }
-          // Login / Streak Bonus Logic
           const tier = getTier(newStreak);
           streakExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
       }
 
-      // --- NEW: WEIGHTED EXP LOGIC ---
-      // Excellent (>90): x1.5
-      // Good (>75): x1.3
-      // Normal (>60): x1.0
-      // Tired (<=60): x0.8
       let multiplier = 1.0;
       if (score > 90) multiplier = 1.5;
       else if (score > 75) multiplier = 1.3;
       else if (score > 60) multiplier = 1.0;
       else multiplier = 0.8;
 
-      // Base EXP: 0.4 per minute
       const baseTimeExp = minutes * 0.4;
       const baseTaskExp = isTaskComplete ? 10 : 0;
       
-      // MULTIPLY ONLY TASK AND TIME EXP
       const weightedActivityExp = Math.ceil((baseTimeExp + baseTaskExp) * multiplier); 
       
-      // ADD STREAK EXP (FLAT)
       let newExp = pet.currentExp + streakExp + weightedActivityExp;
       
       let newLevel = pet.level;
@@ -193,9 +237,8 @@ function App() {
   const handleSimulate = (minutes: number, dateOffset: number = 0) => {
       const d = new Date();
       if (dateOffset !== 0) d.setDate(d.getDate() + dateOffset);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getLocalDateString(d); 
       
-      // Simulate perfect focus (100)
       const simScore = 100;
 
       addFocusRecord(minutes, TimerMode.POMODORO, dateStr, simScore);
@@ -209,14 +252,14 @@ function App() {
       if (!user) return;
       const mockDate = new Date();
       mockDate.setDate(mockDate.getDate() - 2); 
-      const mockDateStr = mockDate.toISOString().split('T')[0];
+      const mockDateStr = getLocalDateString(mockDate); 
       setUser({ ...user, pet: { ...user.pet, lastDailyActivityDate: mockDateStr } });
       NativeService.Haptics.impactMedium();
   };
 
   const handleSessionComplete = (minutes: number, taskCompleted: boolean = false, avgScore: number = 100) => {
       if (currentSessionParams) {
-          const dateStr = new Date().toISOString().split('T')[0];
+          const dateStr = getLocalDateString(); 
           addFocusRecord(minutes, currentSessionParams.mode, dateStr, avgScore);
           if (user) setUser(prev => prev ? processStreakAndExp(prev, minutes, dateStr, taskCompleted, avgScore) : null);
           if (currentSessionParams.taskId && taskCompleted) {
@@ -224,6 +267,7 @@ function App() {
           }
       }
       setIsFocusSessionActive(false);
+      setSessionPhase('IDLE'); // Reset Phase
       setCurrentSessionParams(null);
   };
 
@@ -233,19 +277,30 @@ function App() {
     <div className="h-screen w-full bg-[#f2f2f7] text-gray-900 overflow-hidden font-sans">
       <main className="h-full w-full">
         {isFocusSessionActive && currentSessionParams ? (
-            <FocusSessionView mode={currentSessionParams.mode} initialTimeInSeconds={currentSessionParams.durationMinutes * 60} settings={settings} user={user} task={tasks.find(t => t.id === currentSessionParams.taskId)} onComplete={handleSessionComplete} onCancel={() => setIsFocusSessionActive(false)} onUpgradeTrigger={() => { setIsFocusSessionActive(false); setActiveTab('settings'); }} />
+            <FocusSessionView 
+                mode={currentSessionParams.mode} 
+                initialTimeInSeconds={currentSessionParams.durationMinutes * 60} 
+                settings={settings} 
+                user={user} 
+                task={tasks.find(t => t.id === currentSessionParams.taskId)} 
+                onComplete={handleSessionComplete} 
+                onCancel={() => { setIsFocusSessionActive(false); setSessionPhase('IDLE'); }} 
+                onUpgradeTrigger={() => { setIsFocusSessionActive(false); setSessionPhase('IDLE'); setActiveTab('settings'); }} 
+                // Pass a callback so FocusSessionView can tell App what phase it is in (Work vs Break)
+                onPhaseChange={(phase) => setSessionPhase(phase)}
+            />
         ) : (
-            activeTab === 'timer' ? <TimerView tasks={tasks.filter(t => !t.completed)} settings={settings} setSettings={setSettings} onRecordTime={addFocusRecord} onStartSession={(d, m, tId) => { setCurrentSessionParams({ durationMinutes: d, mode: m, taskId: tId }); setIsFocusSessionActive(true); }} /> :
+            activeTab === 'timer' ? <TimerView tasks={tasks.filter(t => !t.completed)} settings={settings} setSettings={setSettings} onRecordTime={addFocusRecord} onStartSession={(d, m, tId) => { setCurrentSessionParams({ durationMinutes: d, mode: m, taskId: tId }); setIsFocusSessionActive(true); setSessionPhase('WORK'); }} /> :
             activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => {
                 const updatedTask = tasks.find(t => t.id === id);
                 if (updatedTask && !updatedTask.completed && user) {
-                    const dateStr = new Date().toISOString().split('T')[0];
+                    const dateStr = getLocalDateString();
                     setUser(processStreakAndExp(user, 0, dateStr, true));
                 }
                 setTasks(prev => prev.map(x => x.id === id ? { ...x, completed: !x.completed } : x))
             }} /> :
             activeTab === 'stats' ? <StatsView tasks={tasks} focusHistory={focusHistory} settings={settings} onSimulate={handleSimulate} onBreakStreak={handleBreakStreak} /> :
-            <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} />
+            <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} onInjectData={(t, h, u) => { setTasks(t); setFocusHistory(h); setUser(u); }} />
         )}
       </main>
       {!isFocusSessionActive && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} settings={settings} />}

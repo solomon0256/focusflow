@@ -1,9 +1,11 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Calendar as CalendarIcon, CheckCircle2, Circle, MoreHorizontal, Clock, Zap, Trash2, X, CalendarDays, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Task, Priority, Settings } from '../types';
 import { IOSWheelPicker } from '../components/IOSWheelPicker';
 import { translations } from '../utils/translations';
+import { getLocalDateString } from '../App'; // Import Date Fix
 
 interface TasksViewProps {
   tasks: Task[];
@@ -24,7 +26,8 @@ const formatMinutes = (m: number) => {
 };
 
 // --- Calendar Logic Moved Outside Component for Better Type Inference ---
-const isSameDay = (d1: Date, d2: Date) => d1.toISOString().split('T')[0] === d2.toISOString().split('T')[0];
+// FIXED: Use Local Date String comparison
+const isSameDay = (d1: Date, d2: Date) => getLocalDateString(d1) === getLocalDateString(d2);
 
 const generateCalendarGrid = (cursorDate: Date): (Date | null)[] => {
     const year = cursorDate.getFullYear();
@@ -44,8 +47,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   // --- Main View State ---
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [pickerDate, setPickerDate] = useState(new Date()); // For navigating the custom calendar strip
-
+  
   // --- Modal State ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -70,7 +72,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   const [modalCalendarCursor, setModalCalendarCursor] = useState(new Date());
   
   // FIX: Pre-calculate grid to avoid type inference issues
-  const calendarGrid = useMemo(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
+  const calendarGrid = useMemo<(Date | null)[]>(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
 
   // Time Wheel State (12h format)
   const [wHour12, setWHour12] = useState("12");
@@ -117,12 +119,14 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
         } else {
             // New Task
             setFormTitle("");
-            const now = new Date();
-            const dateStr = now.toISOString().split('T')[0];
-            setFormDate(dateStr);
-            setModalCalendarCursor(now);
+            
+            // FIXED: Use Local Date for Default
+            const todayStr = getLocalDateString();
+            setFormDate(todayStr);
+            setModalCalendarCursor(new Date());
             
             // Default time: Next hour
+            const now = new Date();
             const nextHour = new Date();
             nextHour.setHours(now.getHours() + 1, 0, 0, 0);
             const timeStr = `${nextHour.getHours().toString().padStart(2,'0')}:${nextHour.getMinutes().toString().padStart(2,'0')}`;
@@ -212,7 +216,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   }, [selectedDate]);
 
   const hasTaskOnDay = (date: Date) => {
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = getLocalDateString(date); // FIXED
       return tasks.some(t => t.date === dateStr && !t.completed);
   };
 
@@ -233,13 +237,20 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
 
   const getGroupLabel = (dateStr: string) => {
       const d = new Date(dateStr);
-      const today = new Date();
-      const tomorrow = new Date(today);
+      const todayStr = getLocalDateString();
+      const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = getLocalDateString(tomorrow);
 
-      if (dateStr === today.toISOString().split('T')[0]) return t.today;
-      if (dateStr === tomorrow.toISOString().split('T')[0]) return t.tomorrow;
-      return d.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (dateStr === todayStr) return t.today;
+      if (dateStr === tomorrowStr) return t.tomorrow;
+      
+      // Fix Local Date Display
+      // "2023-10-27" -> Date object defaults to UTC midnight, which is 5PM prev day in US.
+      // We must construct it safely.
+      const [y, m, day] = dateStr.split('-').map(Number);
+      const safeDate = new Date(y, m - 1, day);
+      return safeDate.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const getPriorityColor = (p: Priority) => {
@@ -427,7 +438,13 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                         <span className="font-medium text-gray-900">{t.date}</span>
                                     </div>
                                     <span className={`text-sm font-medium transition-colors ${isDatePickerOpen ? 'text-blue-500' : 'text-gray-500'}`}>
-                                        {new Date(formDate).toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        {/* FIXED: Use Local Date string logic for display */}
+                                        {(() => {
+                                            if (!formDate) return "";
+                                            const [y, m, d] = formDate.split('-').map(Number);
+                                            const dateObj = new Date(y, m - 1, d);
+                                            return dateObj.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                        })()}
                                     </span>
                                 </div>
                                 
@@ -460,12 +477,12 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                                 <div className="grid grid-cols-7 gap-1">
                                                     {calendarGrid.map((d, i) => {
                                                         if (!d) return <div key={i} />;
-                                                        const isSelected = d.toISOString().split('T')[0] === formDate;
+                                                        const isSelected = getLocalDateString(d) === formDate; // FIXED
                                                         const isToday = isSameDay(d, new Date());
                                                         return (
                                                             <button 
                                                                 key={i}
-                                                                onClick={() => setFormDate(d.toISOString().split('T')[0])}
+                                                                onClick={() => setFormDate(getLocalDateString(d))} // FIXED
                                                                 className={`h-9 w-9 rounded-full text-sm flex items-center justify-center transition-all
                                                                     ${isSelected ? 'bg-blue-600 text-white font-bold shadow-md' : isToday ? 'text-blue-600 font-bold bg-blue-50' : 'text-gray-700 hover:bg-white'}
                                                                 `}

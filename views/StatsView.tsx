@@ -8,6 +8,7 @@ import { Task, FocusRecord, Settings, User } from '../types';
 import { translations } from '../utils/translations';
 import { getDailyQuote } from '../utils/quotes';
 import { NativeService } from '../services/native';
+import { getLocalDateString } from '../App'; // Importing the fix
 
 interface StatsViewProps {
     tasks: Task[];
@@ -18,8 +19,6 @@ interface StatsViewProps {
 }
 
 // --- ASSET CONFIGURATION (28 LEVELS) ---
-// TODO: Replace empty strings with your actual image URLs once generated.
-// Example: "https://myapp.com/assets/fox_lvl1.png"
 const FOX_ASSETS = [
     '', // Lv 1: Kindergarten (幼稚园)
     '', // Lv 2: Elem 1st (小学一年级)
@@ -66,7 +65,9 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
   const dailyQuote = useMemo(() => getDailyQuote(settings.language), [settings.language]);
 
   const stats = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    // FIXED: Use Local Date String
+    const todayStr = getLocalDateString();
+    
     const todaysRecords = focusHistory.filter(r => r.date === todayStr);
     const totalMinutes = todaysRecords.reduce((acc, curr) => acc + curr.durationMinutes, 0);
     const hours = (totalMinutes / 60).toFixed(1);
@@ -130,7 +131,7 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
     };
   }, [tasks, focusHistory, user, t]);
 
-  // FIXED: Localization support for chart axis
+  // FIXED: Localization support for chart axis AND Date Fix
   const chartData = useMemo(() => {
       const result = [];
       const locale = settings.language === 'zh' || settings.language === 'zh-TW' ? 'zh-CN' : settings.language;
@@ -138,7 +139,9 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
       for (let i = 6; i >= 0; i--) {
           const d = new Date();
           d.setDate(d.getDate() - i);
-          const dateStr = d.toISOString().split('T')[0];
+          
+          // FIXED: Use Local Date String for filtering
+          const dateStr = getLocalDateString(d);
           
           // Dynamic Day Name (e.g., "Mon", "周一")
           const dayName = d.toLocaleDateString(locale, { weekday: 'short' });
@@ -303,7 +306,7 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
     );
   };
 
-  // --- NEW COMPONENT: VIBE STATUS GRID (4 CELLS, EMOJIS, BIG TEXT) ---
+  // --- VIBE STATUS CARD ---
   const VibeStatusCard = () => {
       const tiers = [
           { level: 1, label: t.mood_distracted, mul: 'x0.8', color: 'bg-red-50',     activeColor: 'bg-red-500',    emoji: '😴', border: 'border-red-200' },
@@ -314,7 +317,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
 
       return (
         <IOSCard className="!mb-4 p-5 border border-gray-100 shadow-sm relative overflow-hidden">
-            {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-indigo-50 rounded-lg">
@@ -332,7 +334,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                 )}
             </div>
 
-            {/* BIG STATUS TEXT */}
             <div className="text-center mb-6">
                  {stats.hasData ? (
                      <div className="animate-in zoom-in duration-300">
@@ -346,19 +347,15 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                  )}
             </div>
 
-            {/* 4-Cell Grid (Emojis) */}
             <div className="grid grid-cols-4 gap-2">
                 {!stats.hasData ? (
-                    // Empty State
                     <div className="col-span-4 bg-gray-50 rounded-xl p-4 flex items-center justify-center gap-2 border border-dashed border-gray-200 text-gray-400">
                         <Moon size={16} />
                         <span className="text-xs font-bold">{t.mood_sleeping}</span>
                     </div>
                 ) : (
-                    // Active Grid
                     tiers.map((tier) => {
                         const isActive = stats.tier === tier.level;
-                        
                         return (
                             <div 
                                 key={tier.level}
@@ -376,7 +373,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                     })
                 )}
             </div>
-            
         </IOSCard>
       );
   };
@@ -389,7 +385,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
         </div>
         
         <div className="space-y-4">
-            {/* ITEM 1: LOGIN */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${stats.isLogged ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}>
@@ -405,7 +400,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                 </div>
             </div>
 
-            {/* ITEM 2: TASKS */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${stats.completedCount > 0 ? 'bg-green-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}>
@@ -424,7 +418,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                 </div>
             </div>
 
-            {/* ITEM 3: STUDY EXP */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${stats.studyExp > 0 ? 'bg-orange-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}>
@@ -455,7 +448,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
 
       <PetCard />
       
-      {/* Inserted New Card Here */}
       <VibeStatusCard />
       
       <GrowthChecklist />

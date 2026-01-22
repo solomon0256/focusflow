@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw, Plus, Bell } from 'lucide-react';
+import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw, Plus, Bell, Headphones, Upload } from 'lucide-react';
 import { TimerMode, Task, Settings, Priority } from '../types';
 import { IOSSegmentedControl } from '../components/IOSComponents';
 import { IOSWheelPicker } from '../components/IOSWheelPicker';
+import { SoundSelector } from '../components/SoundSelector'; // New
 import { translations } from '../utils/translations';
 
 interface TimerViewProps {
@@ -86,6 +87,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   
   const [mode, setMode] = useState<TimerMode>(TimerMode.POMODORO);
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
+  const [isSoundSelectorOpen, setIsSoundSelectorOpen] = useState(false); // NEW STATE
   
   // Notification Picker State
   const [isNotificationPickerOpen, setIsNotificationPickerOpen] = useState(false);
@@ -388,7 +390,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
         {/* 1. Header & Status */}
         <div className="mt-2 flex flex-col items-center z-10 w-full mx-auto relative">
             {/* Control Strip */}
-            <div className="flex items-center gap-3 w-full max-w-md mb-6">
+            <div className="flex items-center gap-3 w-full max-w-md mb-6 relative">
                 <div className="flex-1">
                     <IOSSegmentedControl 
                         options={segmentedOptions} 
@@ -402,15 +404,31 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         }} 
                     />
                 </div>
-                {/* Quick Action Button (Settings Toggle) - ONLY for Pomodoro now */}
+                
+                {/* NEW: Sound Button (Larger & More Prominent) */}
                 <button 
-                    onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-md active:scale-95 transition-transform duration-200
-                        ${isQuickSettingsOpen ? 'bg-gray-500' : 'bg-blue-500'}
-                        ${mode !== TimerMode.POMODORO ? 'hidden' : ''}
+                    onClick={() => setIsSoundSelectorOpen(true)}
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 duration-200 border-2
+                        ${settings.soundEnabled 
+                            ? 'bg-indigo-500 border-indigo-500 text-white shadow-indigo-200' 
+                            : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:text-gray-600'
+                        }
                     `}
                 >
-                    {isQuickSettingsOpen ? <X size={18} /> : <SlidersHorizontal size={18} />}
+                    <Headphones size={22} strokeWidth={2.5} />
+                </button>
+
+                {/* Quick Action Button (Larger & More Prominent) - ONLY for Pomodoro now */}
+                <button 
+                    onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 duration-200 border-2
+                        ${isQuickSettingsOpen 
+                            ? 'bg-gray-800 border-gray-800 text-white' 
+                            : (mode === TimerMode.POMODORO ? 'bg-white border-gray-100 text-blue-500 hover:border-blue-100' : 'hidden')
+                        }
+                    `}
+                >
+                    {isQuickSettingsOpen ? <X size={22} strokeWidth={2.5} /> : <SlidersHorizontal size={22} strokeWidth={2.5} />}
                 </button>
             </div>
 
@@ -718,6 +736,13 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </motion.div>
         )}
       </AnimatePresence>
+
+      <SoundSelector 
+        isOpen={isSoundSelectorOpen} 
+        onClose={() => setIsSoundSelectorOpen(false)}
+        settings={settings}
+        setSettings={setSettings}
+      />
     </div>
   );
 };

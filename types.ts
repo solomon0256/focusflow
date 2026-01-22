@@ -32,6 +32,8 @@ export interface Task {
 
 export type LanguageCode = 'en' | 'zh' | 'zh-TW' | 'fr' | 'ja' | 'ko' | 'es' | 'ru' | 'ar' | 'de' | 'hi';
 
+export type SoundMode = 'timer' | 'always';
+
 export interface Settings {
   workTime: number;
   shortBreakTime: number;
@@ -42,6 +44,12 @@ export interface Settings {
   stopwatchNotifications: number[]; // Used for STOPWATCH mode
   language: LanguageCode;
   batterySaverMode: boolean; // New Power Saver Toggle
+  
+  // --- AUDIO SETTINGS ---
+  soundEnabled: boolean;
+  soundMode: SoundMode;
+  selectedSoundId: string;
+  soundVolume: number; // 0.0 to 1.0
 }
 
 export interface FocusRecord {
