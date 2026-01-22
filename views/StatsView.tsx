@@ -130,19 +130,24 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
     };
   }, [tasks, focusHistory, user, t]);
 
+  // FIXED: Localization support for chart axis
   const chartData = useMemo(() => {
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const result = [];
+      const locale = settings.language === 'zh' || settings.language === 'zh-TW' ? 'zh-CN' : settings.language;
+      
       for (let i = 6; i >= 0; i--) {
           const d = new Date();
           d.setDate(d.getDate() - i);
           const dateStr = d.toISOString().split('T')[0];
-          const dayName = days[d.getDay()];
+          
+          // Dynamic Day Name (e.g., "Mon", "周一")
+          const dayName = d.toLocaleDateString(locale, { weekday: 'short' });
+          
           const minutes = focusHistory.filter(r => r.date === dateStr).reduce((acc, curr) => acc + curr.durationMinutes, 0);
           result.push({ name: dayName, minutes: Math.round(minutes) });
       }
       return result;
-  }, [focusHistory]);
+  }, [focusHistory, settings.language]);
 
   const getRankTitle = (level: number) => {
       const ranks = t.academicRanks || [];

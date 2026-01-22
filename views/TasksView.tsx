@@ -68,6 +68,9 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   
   // Calendar Navigation State (Inside Modal)
   const [modalCalendarCursor, setModalCalendarCursor] = useState(new Date());
+  
+  // FIX: Pre-calculate grid to avoid type inference issues
+  const calendarGrid = useMemo(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
 
   // Time Wheel State (12h format)
   const [wHour12, setWHour12] = useState("12");
@@ -439,15 +442,23 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                         >
                                             <div className="p-4">
                                                 <div className="flex justify-between items-center mb-4">
-                                                    <button onClick={() => setModalCalendarCursor(new Date(modalCalendarCursor.setMonth(modalCalendarCursor.getMonth() - 1)))} className="p-1 hover:bg-gray-200 rounded-full"><ChevronLeft size={20} className="text-gray-500"/></button>
+                                                    <button onClick={() => {
+                                                        const next = new Date(modalCalendarCursor);
+                                                        next.setMonth(next.getMonth() - 1);
+                                                        setModalCalendarCursor(next);
+                                                    }} className="p-1 hover:bg-gray-200 rounded-full"><ChevronLeft size={20} className="text-gray-500"/></button>
                                                     <span className="font-bold text-gray-900">{modalCalendarCursor.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', year: 'numeric' })}</span>
-                                                    <button onClick={() => setModalCalendarCursor(new Date(modalCalendarCursor.setMonth(modalCalendarCursor.getMonth() + 1)))} className="p-1 hover:bg-gray-200 rounded-full"><ChevronRight size={20} className="text-gray-500"/></button>
+                                                    <button onClick={() => {
+                                                        const next = new Date(modalCalendarCursor);
+                                                        next.setMonth(next.getMonth() + 1);
+                                                        setModalCalendarCursor(next);
+                                                    }} className="p-1 hover:bg-gray-200 rounded-full"><ChevronRight size={20} className="text-gray-500"/></button>
                                                 </div>
                                                 <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                                                    {['S','M','T','W','T','F','S'].map(d => <span key={d} className="text-[10px] text-gray-400 font-bold">{d}</span>)}
+                                                    {['S','M','T','W','T','F','S'].map((d, i) => <span key={i} className="text-[10px] text-gray-400 font-bold">{d}</span>)}
                                                 </div>
                                                 <div className="grid grid-cols-7 gap-1">
-                                                    {generateCalendarGrid(modalCalendarCursor).map((d, i) => {
+                                                    {calendarGrid.map((d, i) => {
                                                         if (!d) return <div key={i} />;
                                                         const isSelected = d.toISOString().split('T')[0] === formDate;
                                                         const isToday = isSameDay(d, new Date());

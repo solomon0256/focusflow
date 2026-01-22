@@ -95,6 +95,15 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   const [browsingTaskIndex, setBrowsingTaskIndex] = useState(0); 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
+  // FIXED: Safety check for browsing index when task list changes (e.g. completion)
+  useEffect(() => {
+      if (sortedTasks.length === 0) {
+          setBrowsingTaskIndex(0);
+      } else if (browsingTaskIndex >= sortedTasks.length) {
+          setBrowsingTaskIndex(sortedTasks.length - 1);
+      }
+  }, [sortedTasks.length, browsingTaskIndex]);
+
   // Translation Map for Segmented Control
   const modeLabels = useMemo(() => {
       return {
@@ -573,71 +582,75 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                 <div className="relative group w-full">
                     <AnimatePresence mode="wait">
                         <motion.div
-                            key={currentTask.id}
+                            key={currentTask?.id || 'empty'}
                             initial={{ opacity: 0, x: 50 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -50 }}
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                             className={`bg-white rounded-3xl shadow-md border-2 relative overflow-hidden transition-all duration-300
-                            ${selectedTaskId === currentTask.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-transparent'}
+                            ${selectedTaskId === currentTask?.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-transparent'}
                             `}
                         >
                            {/* Priority Indicator Strip */}
-                           <div className={`absolute left-0 top-0 bottom-0 w-2 ${getPriorityColor(currentTask.priority)}`} />
+                           {currentTask && <div className={`absolute left-0 top-0 bottom-0 w-2 ${getPriorityColor(currentTask.priority)}`} />}
 
                            <div className="pl-5 p-4">
-                               <div className="flex justify-between items-start mb-3">
-                                   <div className="pr-2">
-                                        <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{currentTask.title}</h3>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${getPriorityColor(currentTask.priority)}`}>
-                                                {currentTask.priority}
-                                            </span>
-                                            <span className="text-xs text-gray-400 font-medium">
-                                                {currentTask.date}
-                                            </span>
-                                        </div>
-                                   </div>
-                                   <button 
-                                        onClick={handleSelectTask}
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95
-                                            ${selectedTaskId === currentTask.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-300'}
-                                        `}
-                                    >
-                                        {selectedTaskId === currentTask.id ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                                    </button>
-                               </div>
+                               {currentTask ? (
+                                   <>
+                                       <div className="flex justify-between items-start mb-3">
+                                           <div className="pr-2">
+                                                <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{currentTask.title}</h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${getPriorityColor(currentTask.priority)}`}>
+                                                        {currentTask.priority}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400 font-medium">
+                                                        {currentTask.date}
+                                                    </span>
+                                                </div>
+                                           </div>
+                                           <button 
+                                                onClick={handleSelectTask}
+                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95
+                                                    ${selectedTaskId === currentTask.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-300'}
+                                                `}
+                                            >
+                                                {selectedTaskId === currentTask.id ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                                            </button>
+                                       </div>
 
-                               {/* Metadata Grid */}
-                               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
-                                   <div className="flex flex-col items-start">
-                                       <span className="text-[10px] font-bold text-gray-400 uppercase">{t.startLabel}</span>
-                                       <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
-                                           <Clock size={14} className="text-blue-500"/>
-                                           {currentTask.time || '--:--'}
+                                       {/* Metadata Grid */}
+                                       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                                           <div className="flex flex-col items-start">
+                                               <span className="text-[10px] font-bold text-gray-400 uppercase">{t.startLabel}</span>
+                                               <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
+                                                   <Clock size={14} className="text-blue-500"/>
+                                                   {currentTask.time || '--:--'}
+                                               </div>
+                                           </div>
+                                           <div className="flex flex-col items-start">
+                                               <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
+                                               <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
+                                                    <Calendar size={14} className="text-purple-500"/>
+                                                   {formatMinutes(currentTask.durationMinutes)}
+                                               </div>
+                                           </div>
+                                           <div className="flex flex-col items-start">
+                                               <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
+                                               <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
+                                                    <Zap size={14} className="text-yellow-500"/>
+                                                    {currentTask.pomodoroCount}
+                                               </div>
+                                           </div>
                                        </div>
-                                   </div>
-                                   <div className="flex flex-col items-start">
-                                       <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
-                                       <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
-                                            <Calendar size={14} className="text-purple-500"/>
-                                           {formatMinutes(currentTask.durationMinutes)}
-                                       </div>
-                                   </div>
-                                   <div className="flex flex-col items-start">
-                                       <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
-                                       <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
-                                            <Zap size={14} className="text-yellow-500"/>
-                                            {currentTask.pomodoroCount}
-                                       </div>
-                                   </div>
-                               </div>
+                                   </>
+                               ) : <div></div>}
                            </div>
                         </motion.div>
                     </AnimatePresence>
                      <div className="absolute top-1/2 -translate-y-1/2 w-full flex justify-between pointer-events-none px-0 z-20">
                         <button onClick={handlePrevTask} disabled={browsingTaskIndex === 0} className="pointer-events-auto w-10 h-10 -ml-4 bg-white shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 hover:text-blue-500"><ChevronLeft size={24} /></button>
-                        <button onClick={handleNextTask} disabled={browsingTaskIndex === sortedTasks.length - 1} className="pointer-events-auto w-10 h-10 -mr-4 bg-white shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 hover:text-blue-500"><ChevronRight size={24} /></button>
+                        <button onClick={handleNextTask} disabled={browsingTaskIndex >= sortedTasks.length - 1} className="pointer-events-auto w-10 h-10 -mr-4 bg-white shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 hover:text-blue-500"><ChevronRight size={24} /></button>
                     </div>
                 </div>
             ) : (

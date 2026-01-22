@@ -32,7 +32,6 @@ const CDN_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_land
 type SessionState = 'INIT' | 'COUNTDOWN' | 'CALIBRATING' | 'ACTIVE' | 'SUMMARY' | 'ERROR';
 type Phase = 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK';
 
-// [TODO: AI_CONNECTION] Data structures for connecting real AI metrics later
 interface TimelineSegment {
     score: number;      // 0-100
     duration: number;   // minutes (formatted, e.g. 5 or 2.5)
@@ -44,22 +43,17 @@ interface SessionSegmentLog {
     startTime: string;
     durationMinutes: number;
     avgFocusScore: number; 
-    
-    // The chart data breakdown
     timeline: TimelineSegment[];
-    
-    // [TODO: AI_CONNECTION] Real metrics placeholders
     postureQuality: 'Good' | 'Slouching' | 'Unknown'; 
     eyeFatigueLevel: 'Low' | 'Moderate' | 'High';
-    
-    // Raw counters
     postureAlerts: number; 
     distractionCount: number; 
 }
 
 // Helper to format minutes into "1h 30m" or "45m"
-// UPDATED: Fixed floating point precision issues
+// FIXED: Better precision for short durations
 const formatMinutes = (m: number) => {
+    if (m > 0 && m < 1) return '<1m';
     const totalMin = Math.round(m);
     if (totalMin < 60) return `${totalMin}m`;
     const h = Math.floor(totalMin / 60);
@@ -73,7 +67,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   
   // Determine Detection Interval & Resolution Target
   const detectionInterval = settings.batterySaverMode ? INTERVAL_SAVER : INTERVAL_BALANCED;
-  // Eco Mode: 360p (low res) vs Standard: 480p (VGA)
   const targetResolution = settings.batterySaverMode ? { width: 480, height: 360 } : { width: 640, height: 480 };
 
   // --- UI States ---
@@ -139,7 +132,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const [focusScore, setFocusScore] = useState(100); 
 
   // --- Notification Data Preparation ---
-  // Get the correct list of notifications based on current mode
   const activeNotifications = useMemo(() => {
       if (mode === TimerMode.POMODORO) return settings.notifications || [];
       if (mode === TimerMode.CUSTOM) return settings.customNotifications || [];
@@ -147,8 +139,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       return [];
   }, [mode, settings]);
 
-  // Determine the target number of rounds for Pomodoro mode
-  // Priority: Task setting > Global setting
   const targetRounds = useMemo(() => {
       if (mode === TimerMode.POMODORO && task?.pomodoroCount) {
           return task.pomodoroCount;
@@ -222,7 +212,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         if (poseLandmarkerRef.current) poseLandmarkerRef.current.close();
     };
-  }, []); // Re-run if resolution target changes (though usually requires full reload in React to be clean)
+  }, []); 
 
   // 2. Countdown
   useEffect(() => {
@@ -260,7 +250,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       NativeService.Haptics.notificationSuccess();
   };
 
-  // 3. AI Loop (Optimized for Battery Saver)
+  // 3. AI Loop
   useEffect(() => {
       if (sessionState === 'ACTIVE' && phase === 'WORK' && !isAiDisabled && !isPaused) {
           const predictWebcam = () => {
@@ -270,8 +260,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               
               if (video && landmarker && !video.paused && !video.ended && isVideoReady) {
                   const now = performance.now();
-                  // DYNAMIC THROTTLING HERE
-                  // If battery saver is on, this delta check prevents running the model too often
                   if (now - lastPredictionTimeRef.current >= detectionInterval) {
                       const delta = now - lastFrameTimeRef.current;
                       if (delta > 0) fpsRef.current = 1000 / delta; 
@@ -292,27 +280,21 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           requestRef.current = requestAnimationFrame(predictWebcam);
       }
       return () => cancelAnimationFrame(requestRef.current);
-  }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase, detectionInterval]); // Re-bind if interval changes
+  }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase, detectionInterval]); 
 
-  // --- LOGIC: Record Stats (SIMPLIFIED ALGORITHM) ---
+  // --- LOGIC: Record Stats ---
   const recordCycleStats = (durationMinutes: number) => {
-      // 1. Convert to total seconds (Integer) to avoid floating point drift
       const totalSeconds = Math.floor(durationMinutes * 60);
-      
       const timelineSegments: TimelineSegment[] = [];
       let secondsProcessed = 0;
       
-      // 2. Simplest Algorithm: Slice into 5-minute (300s) chunks
       while (secondsProcessed < totalSeconds) {
           const secondsLeft = totalSeconds - secondsProcessed;
           const chunkSeconds = Math.min(300, secondsLeft); // Max 5 mins
           
-          // Calculate formatted minutes for this chunk
-          // e.g. 300s -> 5, 56s -> 0.9
           let chunkMinutes = Number((chunkSeconds / 60).toFixed(1));
-          if (chunkMinutes === 0 && chunkSeconds > 0) chunkMinutes = 0.1; // Min display
+          if (chunkMinutes === 0 && chunkSeconds > 0) chunkMinutes = 0.1;
           
-          // Mock score variation
           const variance = Math.floor(Math.random() * 8) - 4;
           const segScore = Math.max(0, Math.min(100, focusScore + variance));
 
@@ -325,7 +307,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           secondsProcessed += chunkSeconds;
       }
 
-      // 3. Final total formatted for log
       const formattedTotalMinutes = Number((totalSeconds / 60).toFixed(1));
 
       const log: SessionSegmentLog = {
@@ -334,17 +315,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           durationMinutes: formattedTotalMinutes,
           avgFocusScore: focusScore, 
           timeline: timelineSegments,
-          
           postureAlerts: currentSegmentMetrics.current.postureIssues,
           distractionCount: currentSegmentMetrics.current.distractions,
-          
           postureQuality: currentSegmentMetrics.current.postureIssues > 2 ? 'Slouching' : 'Good',
           eyeFatigueLevel: 'Low'
       };
 
       sessionHistoryRef.current.push(log);
       
-      // Reset metrics
       currentSegmentMetrics.current = {
           distractions: 0,
           postureIssues: 0,
@@ -359,53 +337,41 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const interval = setInterval(() => {
           setTimeLeft((prev) => {
               if (phase === 'WORK') {
-                  // Increment Stats Trackers
                   totalFocusedSecondsRef.current += 1;
                   currentCycleElapsedRef.current += 1;
                   
-                  // --- NOTIFICATION TRIGGER LOGIC (ELAPSED TIME) ---
                   const elapsedSeconds = totalFocusedSecondsRef.current;
-                  // Check if we hit a minute mark exactly (e.g., 300s, 600s)
                   if (elapsedSeconds % 60 === 0) {
                       const elapsedMinutes = elapsedSeconds / 60;
                       if (activeNotifications.includes(elapsedMinutes)) {
-                          // TRIGGER!
                           NativeService.Haptics.notificationSuccess();
                           setNotificationMsg(`${elapsedMinutes} minutes reached`);
-                          // Auto-hide toast after 3s
                           setTimeout(() => setNotificationMsg(null), 3000);
                       }
                   }
               }
 
-              // STOPWATCH: Count UP
               if (mode === TimerMode.STOPWATCH) {
                   return prev + 1;
               }
 
-              // COUNTDOWN: Count DOWN
               if (prev <= 1) {
-                  // Timer Finished
                   if (phase === 'WORK') {
-                      // UPDATED: Record exact elapsed time of this cycle, not just config time
                       const elapsedMins = currentCycleElapsedRef.current / 60;
                       recordCycleStats(elapsedMins); 
-                      currentCycleElapsedRef.current = 0; // Reset for next cycle
+                      currentCycleElapsedRef.current = 0; 
 
                       const newRounds = roundsCompleted + 1;
                       setRoundsCompleted(newRounds);
                       NativeService.Haptics.notificationSuccess();
 
-                      // Use targetRounds here instead of settings.pomodorosPerRound
                       if (mode === TimerMode.POMODORO && newRounds < targetRounds) {
                           setPhase('SHORT_BREAK');
                           return settings.shortBreakTime * 60;
                       } else if (mode === TimerMode.POMODORO && newRounds >= targetRounds) {
-                          // End of set -> Long Break (which finishes session after)
                           setPhase('LONG_BREAK');
                           return settings.longBreakTime * 60;
                       } else {
-                          // Fallback
                           clearInterval(interval);
                           handleShowSummary(true); 
                           return 0;
@@ -431,17 +397,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   }, [sessionState, isPaused, phase, roundsCompleted, settings, mode, activeNotifications, targetRounds]);
 
   const handleShowSummary = (naturalFinish: boolean = false) => {
-      // If Stopwatch mode (manual stop) or early stop, record what we have
       if (mode === TimerMode.STOPWATCH || !naturalFinish) {
            const elapsedMins = currentCycleElapsedRef.current / 60;
-           if (elapsedMins > 0.05) { // Only record if > 3 seconds
+           if (elapsedMins > 0.05) { 
                recordCycleStats(elapsedMins);
            }
       }
 
       setDidFinishNaturally(naturalFinish);
-      
-      // Auto-check task logic: Only if Pomodoro AND Natural Finish
       if (mode === TimerMode.POMODORO && naturalFinish) {
           setIsTaskCompleted(true);
       } else {
@@ -454,17 +417,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const handleFinish = () => {
       const minutes = totalFocusedSecondsRef.current / 60;
-      
-      // Calculate Average Session Score from segments
       let avgScore = 100;
       if (sessionHistoryRef.current.length > 0) {
           const totalScore = sessionHistoryRef.current.reduce((acc, curr) => acc + curr.avgFocusScore, 0);
           avgScore = Math.ceil(totalScore / sessionHistoryRef.current.length);
       } else {
-          // Fallback if no segments recorded (extremely short session)
           avgScore = Math.ceil(focusScore);
       }
-      
       onComplete(Number(minutes.toFixed(1)), isTaskCompleted, avgScore);
   };
 
@@ -479,28 +438,18 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       }
   };
 
-  // --- DEBUG TOOL ---
   const handleDebugFastForward = () => {
       if (phase === 'WORK') {
           const SKIP_MINUTES = 30;
           const SKIP_SECONDS = SKIP_MINUTES * 60;
-          
-          // 1. Generate fake stats for the skipped time so chart isn't empty
           recordCycleStats(SKIP_MINUTES);
-          
-          // 2. Add to global counters
           totalFocusedSecondsRef.current += SKIP_SECONDS;
           
-          // 3. Subtract from current countdown (or add if stopwatch)
           if (mode === TimerMode.POMODORO || mode === TimerMode.CUSTOM) {
               if (timeLeft > SKIP_SECONDS) {
-                  // Skip 30m but continue session
                   setTimeLeft(prev => prev - SKIP_SECONDS);
-                  // We don't add to currentCycleElapsedRef because we already recorded stats for it
                   setNotificationMsg(`⚡ Debug: Skipped ${SKIP_MINUTES}m`);
               } else {
-                  // Finish immediately (less than 30m left)
-                  // We treat the remainder as if it passed too
                   const remainingMins = timeLeft / 60;
                   recordCycleStats(remainingMins);
                   totalFocusedSecondsRef.current += timeLeft;
@@ -508,16 +457,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                   setNotificationMsg("⚡ Debug: Finishing...");
               }
           } else {
-              // Stopwatch: just add time
               setTimeLeft(prev => prev + SKIP_SECONDS);
               setNotificationMsg(`⚡ Debug: Added ${SKIP_MINUTES}m`);
           }
-          
           setTimeout(() => setNotificationMsg(null), 2000);
       }
   };
 
-  // --- Visualization Logic ---
   const analyzePose_Debug_Visualization = (results: any, video: HTMLVideoElement, canvas: HTMLCanvasElement | null) => {
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
@@ -527,7 +473,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       canvas.height = video.videoHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw FPS
       const targetFPS = settings.batterySaverMode ? 2 : 5;
       
       ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
@@ -536,7 +481,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.font = "14px monospace";
       ctx.fillText(`Target: ${targetFPS} FPS`, 20, 30);
       ctx.fillText(`Actual: ${fpsRef.current.toFixed(1)} FPS`, 20, 50);
-      // Show resolution for debug
       ctx.fillText(`Res: ${canvas.width}x${canvas.height}`, 20, 130);
       
       const landmarks = results.landmarks?.[0];
@@ -621,7 +565,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const isBreak = phase === 'SHORT_BREAK' || phase === 'LONG_BREAK';
 
-  // Helper to get stats for the break screen
   const getLastSessionStats = () => {
       const history = sessionHistoryRef.current;
       if (history.length === 0) return null;
