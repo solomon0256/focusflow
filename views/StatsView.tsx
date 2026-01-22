@@ -17,6 +17,40 @@ interface StatsViewProps {
     onBreakStreak?: () => void;
 }
 
+// --- ASSET CONFIGURATION (28 LEVELS) ---
+// TODO: Replace empty strings with your actual image URLs once generated.
+// Example: "https://myapp.com/assets/fox_lvl1.png"
+const FOX_ASSETS = [
+    '', // Lv 1: Kindergarten (幼稚园)
+    '', // Lv 2: Elem 1st (小学一年级)
+    '', // Lv 3: Elem 2nd (小学二年级)
+    '', // Lv 4: Elem 3rd (小学三年级)
+    '', // Lv 5: Elem 4th (小学四年级)
+    '', // Lv 6: Elem 5th (小学五年级)
+    '', // Lv 7: Elem 6th (小学六年级)
+    '', // Lv 8: Middle 7th (初一)
+    '', // Lv 9: Middle 8th (初二)
+    '', // Lv 10: Middle 9th (初三)
+    '', // Lv 11: High 10th (高一)
+    '', // Lv 12: High 11th (高二)
+    '', // Lv 13: High 12th (高三)
+    '', // Lv 14: High Senior (高四/复读)
+    '', // Lv 15: College 1st (大一)
+    '', // Lv 16: College 2nd (大二)
+    '', // Lv 17: College 3rd (大三)
+    '', // Lv 18: College 4th (大四)
+    '', // Lv 19: Master 1st (研一)
+    '', // Lv 20: Master 2nd (研二)
+    '', // Lv 21: PhD Candidate (博一)
+    '', // Lv 22: PhD Researcher (博二)
+    '', // Lv 23: PhD Finalist (博三)
+    '', // Lv 24: Postdoc (博后)
+    '', // Lv 25: Asst Prof (助理教授)
+    '', // Lv 26: Assoc Prof (副教授)
+    '', // Lv 27: Professor (教授)
+    '', // Lv 28: Dean (院长/院士)
+];
+
 const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, onSimulate, onBreakStreak }) => {
   const t = translations[settings.language].stats;
   const [isPetExpanded, setIsPetExpanded] = useState(false);
@@ -116,60 +150,27 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
       return ranks[index];
   };
 
-  // --- FOX AVATAR ASSETS & LOGIC (28 Levels) ---
-  // PLACEHOLDER: Once you have the images, fill this array with the URLs.
-  // Leave empty string '' to fallback to Emoji.
-  const FOX_ASSETS = [
-      '', // L1: Kindergarten
-      '', // L2: Elem 1st
-      '', // L3: Elem 2nd
-      '', // L4: Elem 3rd
-      '', // L5: Elem 4th
-      '', // L6: Elem 5th
-      '', // L7: Elem 6th
-      '', // L8: Middle 7th
-      '', // L9: Middle 8th
-      '', // L10: Middle 9th
-      '', // L11: High 10th
-      '', // L12: High 11th
-      '', // L13: High 12th
-      '', // L14: High Senior
-      '', // L15: College 1st
-      '', // L16: College 2nd
-      '', // L17: College 3rd
-      '', // L18: College 4th
-      '', // L19: Master 1st
-      '', // L20: Master 2nd
-      '', // L21: PhD Candidate
-      '', // L22: PhD Researcher
-      '', // L23: PhD Finalist
-      '', // L24: Postdoc
-      '', // L25: Asst Prof
-      '', // L26: Assoc Prof
-      '', // L27: Professor
-      '', // L28: Dean
-  ];
-
+  // --- AVATAR RESOLVER ---
   const getFoxAvatar = (level: number) => {
-      // Clamp level between 1 and 28
+      // 1. Safe clamp level 1-28
       const safeLevel = Math.max(1, Math.min(level, 28));
-      const assetIndex = safeLevel - 1;
       
-      const imageUrl = FOX_ASSETS[assetIndex];
+      // 2. Try to get image URL
+      const imageUrl = FOX_ASSETS[safeLevel - 1];
 
-      if (imageUrl) {
+      // 3. Return object
+      if (imageUrl && imageUrl.length > 0) {
           return { type: 'img', val: imageUrl };
       }
 
-      // FALLBACK: If no image provided yet, stick with Emoji but vary scale slightly
-      // Just to show *something* changes
-      return { type: 'emoji', val: '🦊', scale: 1.0 + (assetIndex * 0.02) }; 
+      // 4. Fallback Emoji Logic if no image
+      // Just vary the scale slightly to show growth
+      return { type: 'emoji', val: '🦊', scale: 1.0 + (safeLevel * 0.02) }; 
   };
 
   // --- COMPONENT: THE PURPLE PET CARD (Fox Left, Streak Right) ---
   const PetCard = () => {
     const streakDay = user?.pet.streakCount || 0;
-    // Calculate streak bonus EXP (mock logic matching App.tsx)
     const tier = streakDay >= 6 ? 4 : streakDay >= 4 ? 3 : streakDay >= 2 ? 2 : 1;
     const streakExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
 
@@ -237,14 +238,14 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                         className="relative z-10 filter drop-shadow-2xl"
                      >
                         {avatar.type === 'emoji' ? (
-                            <div className="text-8xl transform origin-center" style={{ transform: `scale(${avatar.scale})` }}>
+                            <div className="text-8xl transform origin-center select-none" style={{ transform: `scale(${avatar.scale})` }}>
                                 {avatar.val}
                             </div>
                         ) : (
                             <img 
                                 src={avatar.val} 
                                 alt="Fox Avatar" 
-                                className="w-32 h-32 object-contain"
+                                className="w-32 h-32 object-contain select-none pointer-events-none drop-shadow-xl"
                             />
                         )}
                      </motion.div>
@@ -253,14 +254,13 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
                 {/* RIGHT: STREAK INFO */}
                 <div className="flex-1 pl-4 flex flex-col justify-center">
                     
-                    {/* BIG STREAK TEXT (Moved Up) */}
+                    {/* BIG STREAK TEXT */}
                     <div className="text-right mb-3">
                         <div className="flex items-center justify-end gap-1.5 mb-0.5">
                             <Flame size={16} className="text-orange-300 fill-orange-300 animate-pulse" />
                             <span className="text-xs font-bold text-orange-200 uppercase tracking-wide">{t.streakTitle}</span>
                         </div>
                         
-                        {/* Custom Formatting: Day X Streak, EXP+Y */}
                         <div className="text-right">
                             <div className="text-3xl font-black text-white leading-none mb-1">
                                 {t.streakDetail.split(',')[0].replace('{n}', streakDay.toString())}
@@ -300,8 +300,6 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
 
   // --- NEW COMPONENT: VIBE STATUS GRID (4 CELLS, EMOJIS, BIG TEXT) ---
   const VibeStatusCard = () => {
-      // 4 States: Distracted, Low, Focused, Flow
-      // Icons: Emojis as requested
       const tiers = [
           { level: 1, label: t.mood_distracted, mul: 'x0.8', color: 'bg-red-50',     activeColor: 'bg-red-500',    emoji: '😴', border: 'border-red-200' },
           { level: 2, label: t.mood_low,        mul: 'x1.0', color: 'bg-orange-50',  activeColor: 'bg-orange-500', emoji: '😐', border: 'border-orange-200' },

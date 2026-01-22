@@ -23,6 +23,21 @@ const formatMinutes = (m: number) => {
     return `${h}h ${min}m`;
 };
 
+// --- Calendar Logic Moved Outside Component for Better Type Inference ---
+const isSameDay = (d1: Date, d2: Date) => d1.toISOString().split('T')[0] === d2.toISOString().split('T')[0];
+
+const generateCalendarGrid = (cursorDate: Date): (Date | null)[] => {
+    const year = cursorDate.getFullYear();
+    const month = cursorDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
+    
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+    return days;
+};
+
 const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateTask, deleteTask, toggleTask }) => {
   const t = translations[settings.language].tasks;
 
@@ -178,21 +193,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   const openAdd = () => {
       setEditingTask(null);
       setIsModalOpen(true);
-  };
-
-  // --- Calendar Logic ---
-  const isSameDay = (d1: Date, d2: Date) => d1.toISOString().split('T')[0] === d2.toISOString().split('T')[0];
-  
-  const generateCalendarGrid = (cursorDate: Date) => {
-      const year = cursorDate.getFullYear();
-      const month = cursorDate.getMonth();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
-      
-      const days: (Date | null)[] = [];
-      for (let i = 0; i < firstDay; i++) days.push(null);
-      for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
-      return days;
   };
 
   // --- Main View Data ---
