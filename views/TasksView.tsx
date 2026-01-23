@@ -72,7 +72,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   const [modalCalendarCursor, setModalCalendarCursor] = useState(new Date());
   
   // FIX: Pre-calculate grid to avoid type inference issues
-  const calendarGrid = useMemo<(Date | null)[]>(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
+  // Using explicit type annotation instead of generic to avoid TSX parsing issues
+  const calendarGrid: (Date | null)[] = useMemo(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
 
   // Time Wheel State (12h format)
   const [wHour12, setWHour12] = useState("12");

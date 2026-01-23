@@ -7,6 +7,7 @@ import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-
 import { NativeService } from '../services/native';
 import { AdBanner } from '../components/AdBanner';
 import { translations } from '../utils/translations';
+import { AudioService } from '../services/audio'; // Import AudioService
 
 interface FocusSessionViewProps {
   mode: TimerMode;
@@ -117,6 +118,20 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
   const [focusScore, setFocusScore] = useState(100); 
+
+  // --- AUDIO CONTROL: Dynamic Volume based on Focus ---
+  useEffect(() => {
+      // If sound is enabled, adjust volume based on focus state.
+      // Distracted = Lower volume (loss of immersion)
+      // Focused = Normal volume
+      if (settings.soundEnabled) {
+          if (focusState === 'DISTRACTED' || focusState === 'ABSENT') {
+              AudioService.setDynamicVolumeScale(0.2);
+          } else {
+              AudioService.setDynamicVolumeScale(1.0);
+          }
+      }
+  }, [focusState, settings.soundEnabled]);
 
   const activeNotifications = useMemo(() => {
       if (mode === TimerMode.POMODORO) return settings.notifications || [];
@@ -493,41 +508,54 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
       const targetFPS = settings.batterySaverMode ? 2 : 5;
       
-      ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-      ctx.fillRect(10, 10, 240, 150);
-      ctx.fillStyle = "#00FF00";
-      ctx.font = "14px monospace";
-      ctx.fillText(`Target: ${targetFPS} FPS`, 20, 30);
-      ctx.fillText(`Actual: ${fpsRef.current.toFixed(1)} FPS`, 20, 50);
-      ctx.fillText(`Res: ${canvas.width}x${canvas.height}`, 20, 130);
-      
       const landmarks = results.landmarks?.[0];
-
+      
+      let newState: 'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT' = 'ABSENT';
+      
       if (landmarks) {
           const nose = landmarks[0];
           const leftEar = landmarks[7];
           const rightEar = landmarks[8];
-          
-          const earMidX = (leftEar.x + rightEar.x) / 2;
-          const earMidY = (leftEar.y + rightEar.y) / 2;
           const headWidth = Math.abs(leftEar.x - rightEar.x);
+          const earMidX = (leftEar.x + rightEar.x) / 2;
           const rawYawRatio = (nose.x - earMidX) / headWidth;
-
+          
           smoothYawRef.current = (smoothYawRef.current * 0.7) + (rawYawRatio * 0.3);
-          const currentYaw = smoothYawRef.current;
-          const approxDegrees = currentYaw * 90;
+          const currentYaw = smoothYawRef.current * 90;
+          
+          if (Math.abs(currentYaw) > 40) {
+              newState = 'DISTRACTED';
+              setFocusScore(prev => Math.max(0, prev - 0.2));
+          } else if (Math.abs(currentYaw) < 15) {
+              newState = 'DEEP_FLOW';
+              setFocusScore(prev => Math.min(100, prev + 0.1));
+          } else {
+              newState = 'FOCUSED';
+              setFocusScore(prev => Math.min(100, prev + 0.05));
+          }
+          
+          setFocusState(newState);
 
+          // ... (Visualization drawing code remains the same)
+          ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+          ctx.fillRect(10, 10, 240, 150);
+          ctx.fillStyle = "#00FF00";
+          ctx.font = "14px monospace";
+          ctx.fillText(`Target: ${targetFPS} FPS`, 20, 30);
+          ctx.fillText(`Actual: ${fpsRef.current.toFixed(1)} FPS`, 20, 50);
+          
           ctx.fillStyle = "#FFFFFF";
           ctx.fillText(`Points: ${landmarks.length}`, 20, 70);
           
-          const isFacingFront = Math.abs(approxDegrees) < 25; 
+          const isFacingFront = Math.abs(currentYaw) < 25; 
           ctx.fillStyle = isFacingFront ? "#00FF00" : "#FF0000";
-          ctx.fillText(`Head Yaw: ${approxDegrees.toFixed(1)}°`, 20, 90);
-          ctx.fillText(isFacingFront ? "FACING: FRONT" : "FACING: SIDE", 20, 110);
+          ctx.fillText(`Head Yaw: ${currentYaw.toFixed(1)}°`, 20, 90);
+          ctx.fillText(newState, 20, 110);
           
           if (drawingUtilsRef.current) {
               const boxW = headWidth * 0.5 * canvas.width;
               const boxH = headWidth * 1.5 * canvas.height;
+              const earMidY = (leftEar.y + rightEar.y) / 2;
               const boxX = (earMidX * canvas.width) - (boxW / 2);
               const boxY = (earMidY * canvas.height) - (boxH / 2);
               
@@ -535,29 +563,20 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               ctx.lineWidth = 2;
               ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-              ctx.beginPath();
-              ctx.moveTo(earMidX * canvas.width, earMidY * canvas.height);
-              ctx.lineTo(nose.x * canvas.width, nose.y * canvas.height);
-              ctx.strokeStyle = isFacingFront ? "#00FF00" : "#FF0000";
-              ctx.lineWidth = 4;
-              ctx.stroke();
-
               [nose, leftEar, rightEar].forEach(pt => {
                   ctx.beginPath();
                   ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 6, 0, 2 * Math.PI);
                   ctx.fillStyle = "white";
                   ctx.fill();
               });
-              
-              ctx.beginPath();
-              ctx.moveTo(leftEar.x * canvas.width, leftEar.y * canvas.height);
-              ctx.lineTo(rightEar.x * canvas.width, rightEar.y * canvas.height);
-              ctx.strokeStyle = "yellow";
-              ctx.lineWidth = 2;
-              ctx.stroke();
           }
       } else {
+          setFocusState('ABSENT');
+          setFocusScore(prev => Math.max(0, prev - 0.1));
+          ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+          ctx.fillRect(10, 10, 240, 150);
           ctx.fillStyle = "red";
+          ctx.font = "14px monospace";
           ctx.fillText("NO POSE DETECTED", 20, 70);
       }
   };
