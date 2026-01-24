@@ -1,52 +1,42 @@
-# FOX (Focus Pet) System Design
+# FOX (Focus Pet) System Design V2
 
-## 1. Philosophy
-The pet system is designed to encourage **consistency** rather than just intensity. It rewards the act of showing up every day.
+## 1. 核心理念 (Philosophy)
+宠物系统不仅是数值的累加，更是用户专注旅程的视觉化身。采用 **“若心流” (FocusFlow)** 的设计哲学，将专注转化为宠物的成长。
 
-*   **Name**: FOX (福克斯)
-*   **Visual Style**: Transitioning to Anime/2D (二次元).
-
----
-
-## 2. Core Mechanics
-
-### A. Experience (EXP) & Leveling
-The pet grows by gaining **Focus EXP**.
-
-**Leveling Curve (Draft):**
-| Level | Required EXP | Title | Unlocks |
-| :--- | :--- | :--- | :--- |
-| 1 | 0 | Novice | Base Skin |
-| 2 | 50 | Apprentice | Background Music 1 |
-| 3 | 150 | Adept | Accessory: Glasses |
-| 4 | 300 | Expert | Skin: Dark Mode Fox |
-| 5 | 500 | Master | Background Music 2 |
-
-### B. Daily Login Reward (每日登录)
-*   **Definition**: Completing a focus session of **> 0.1 Hours** (approx 5-6 minutes).
-*   **Reward**: **+5 EXP** (Once per day).
-*   **Feedback**:
-    *   Visual toast: "Daily Goal Met! +5 EXP"
-    *   Pet animation: Happy/Jump.
-
-### C. Sustained Focus Reward (Planned)
-*   **Logic**: +1 EXP for every 10 minutes of focus.
-*   **Bonus**: +20% EXP for "Deep Focus" state (AI verified).
+*   **名字**: 福克斯 (FOX).
+*   **视觉风格**: 二次元/动效增强 (Anime/Procedural Motion).
 
 ---
 
-## 3. Implementation Data Structure
+## 2. 资源管理策略 (Asset Strategy) - **针对 10MB 限制优化**
 
-```typescript
-interface UserPet {
-    level: number;
-    currentExp: number;
-    maxExp: number; // calculated as 50 * level^1.5 approx
-    happiness: number; // 0-100, decays daily
-    lastDailyActivityDate: string; // "YYYY-MM-DD" to track daily login
-}
-```
+### 2.1 远程资源托管 (Cloud Hosting)
+由于高清 2D 素材（单张 7-8MB）远超项目配额，系统采用以下逻辑：
+*   **零本地存储**: App 本身不包含任何宠物二进制大图。
+*   **按需加载**: 仅在 `StatsView` 渲染时，通过 `RemotePetRenderer` 从外部 CDN 下载当前等级对应的 WebP 图像。
+*   **缓存机制**: 利用浏览器 Cache API 实现一次加载，持久化缓存。
 
-## 4. Future "Gacha" System
-*   Users earn "Coins" alongside EXP.
-*   Coins can be used to draw random accessories for FOX.
+### 2.2 视觉增强技术
+*   **WebP 压缩**: 所有素材必须转换为 WebP 格式，目标单张大小 < 800KB。
+*   **动态滤镜**: 使用 CSS `filter: drop-shadow` 和 `hue-rotate` 为不同等级实现视觉微调，而无需增加额外大图。
+
+---
+
+## 3. 核心机制 (Mechanics)
+
+### A. 经验值与等级 (EXP & Leveling)
+*   **基础规则**: 每专注 25 分钟可获得 10 EXP。
+*   **心流奖励**: 如果专注评分 > 90，该时段 EXP 收益增加 50%。
+*   **连胜奖励**: 每日登录并完成一轮专注，额外获得连胜 EXP。
+
+### B. 状态机 (State Machine)
+*   **睡眠 (Sleeping)**: 24小时内未专注。
+*   **集中 (Focused)**: 正在进行有效的专注。
+*   **跃动 (Happy)**: 完成长时专注后。
+
+---
+
+## 4. 视觉路线图
+*   **Lv 1-10**: 幼年态（简约风）。
+*   **Lv 11-20**: 成年态（精细 2D 插画）。
+*   **Lv 21-28**: 觉醒态（带动态粒子效果）。

@@ -34,6 +34,8 @@ export type LanguageCode = 'en' | 'zh' | 'zh-TW' | 'fr' | 'ja' | 'ko' | 'es' | '
 
 export type SoundMode = 'timer' | 'always';
 
+export type ThemeMode = 'system' | 'light' | 'dark'; // New Theme Type
+
 export interface Settings {
   workTime: number;
   shortBreakTime: number;
@@ -45,6 +47,9 @@ export interface Settings {
   language: LanguageCode;
   batterySaverMode: boolean; // New Power Saver Toggle
   
+  // --- THEME SETTINGS ---
+  theme: ThemeMode;
+
   // --- AUDIO SETTINGS ---
   soundEnabled: boolean;
   soundMode: SoundMode;

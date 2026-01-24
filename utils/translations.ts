@@ -40,23 +40,24 @@ const en = {
     streakCushion: 'Cushion Active',
     todaysVibe: "Today's Vibe",
     avgScore: "Avg Score",
-    // THE 4 SPECIFIC STATES REQUESTED
-    mood_flow: "Flow",          // 心流
-    mood_focused: "Focused",    // 集中
-    mood_low: "Not Focused",    // 不太集中
-    mood_distracted: "Distracted", // 分神
+    mood_flow: "Flow",
+    mood_focused: "Focused",
+    mood_low: "Not Focused",
+    mood_distracted: "Distracted",
     mood_sleeping: "No Data",
     dailyQuote: "Daily Quote",
     streakDetail: "Day {n} Streak, EXP +{e}"
   },
-  settings: { title: 'Settings', proTitle: 'FocusFlow Pro', proDesc: 'Sync data & support development.', viewOffer: 'View Offer', proMember: 'Pro Member', thanks: 'Thank you!', cloudSync: 'Cloud Sync', enableCloud: 'Enable Cloud Sync', signOut: 'Sign Out', timerConfig: 'Timer Config', focusDuration: 'Focus', shortBreak: 'Short Break', longBreak: 'Long Break', intervals: 'Pomos', language: 'Language', support: 'Support', restore: 'Restore', privacy: 'Privacy', reset: 'Reset', choosePlan: 'Choose a Plan', recurring: 'Recurring billing.', subscribe: 'Subscribe', notifications: 'Notifications', addNotification: 'Add Time', notifyAt: 'Notify at', performance: 'Performance', powerSaver: 'Power Saver', powerSaverDesc: 'Saves battery.' },
+  settings: { title: 'Settings', proTitle: 'FocusFlow Pro', proDesc: 'Sync data & support development.', viewOffer: 'View Offer', proMember: 'Pro Member', thanks: 'Thank you!', cloudSync: 'Cloud Sync', enableCloud: 'Enable Cloud Sync', signOut: 'Sign Out', timerConfig: 'Timer Config', focusDuration: 'Focus', shortBreak: 'Short Break', longBreak: 'Long Break', intervals: 'Pomos', language: 'Language', support: 'Support', restore: 'Restore', privacy: 'Privacy', reset: 'Reset', choosePlan: 'Choose a Plan', recurring: 'Recurring billing.', subscribe: 'Subscribe', notifications: 'Notifications', addNotification: 'Add Time', notifyAt: 'Notify at', performance: 'Performance', powerSaver: 'Power Saver', powerSaverDesc: 'Saves battery.', appearance: 'Appearance', theme: 'Theme', theme_system: 'System', theme_light: 'Light', theme_dark: 'Dark' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'Sync Devices', feat_history: 'Unlimited Stats', feat_skins: 'Fox Skins', feat_noise: 'White Noise', feat_support: 'Support Dev ❤️', monthly_name: 'Monthly', monthly_desc: 'Billed monthly.', yearly_name: 'Yearly', yearly_desc: 'Best price.', yearly_tag: 'SAVE 45%', lifetime_name: 'Lifetime', lifetime_desc: 'One-time.', lifetime_tag: 'VALUE' },
-  session: { complete: 'Done!', focusedFor: 'Focused for', minutes: 'min', avgFocus: 'Avg', posture: 'Posture', timeline: 'Timeline', cycleLog: 'Log', backHome: 'Home', recharge: 'Recharge', rest: 'Rest', breathe: 'Breathe', skipBreak: 'Skip', paused: 'Paused', focusGuard: 'Guard', proPosture: 'Posture', fullBodyAi: 'Full AI', focusTime: 'Focus', taskCompleted: 'Done', markAsDone: 'Mark done?', sessionDoneAuto: 'Auto-saved', sessionDoneManual: 'Save?', earlyStop: 'Stopped' }
+  session: { complete: 'Done!', focusedFor: 'Focused for', minutes: 'min', avgFocus: 'Avg', posture: 'Posture', timeline: 'Timeline', cycleLog: 'Log', backHome: 'Home', recharge: 'Recharge', rest: 'Rest', breathe: 'Breathe', skipBreak: 'Skip', paused: 'Paused', focusGuard: 'Guard', proPosture: 'Posture', fullBodyAi: 'Full AI', focusTime: 'Focus', taskCompleted: 'Done', markAsDone: 'Mark done?', sessionDoneAuto: 'Auto-saved', sessionDoneManual: 'Save?', earlyStop: 'Stopped', tooClose: 'Too Close' },
+  sound: { title: 'Background Audio', smartVolume: 'Smart Adaptive Volume', smartVolumeDesc: 'Dips volume when AI detects distraction.', timerOnly: 'Timer Only', alwaysOn: 'Always On', frequency: 'Frequency', ambience: 'Ambience', custom: 'Custom', upload: 'Upload', off: 'Off' }
 };
 
 // 2. SIMPLIFIED CHINESE
 const zh = {
+  ...en,
   common: { confirm: '确认', cancel: '取消', back: '返回', save: '保存', delete: '删除', loading: '加载中...' },
   nav: { timer: '计时', tasks: '任务', stats: '统计', settings: '设置' },
   timer: { ready: '准备专注', estCycle: '预计时长', focusTime: '专注时长', break: '休息', start: '开始', pause: '暂停', resume: '继续', stopwatchActive: '正计时模式运行中', noTasks: '暂无进行中的任务', addOne: '去任务页添加一个吧', selectTask: '选择任务', startLabel: '开始', duration: '时长', pomos: '番茄数', mode_pomodoro: '番茄钟', mode_stopwatch: '正计时', mode_custom: '自定义' },
@@ -92,7 +93,6 @@ const zh = {
     streakCushion: '缓冲保护中',
     todaysVibe: "今日状态",
     avgScore: "平均分",
-    // 4 SPECIFIC STATES
     mood_flow: "心流",
     mood_focused: "集中",
     mood_low: "不太集中",
@@ -101,14 +101,16 @@ const zh = {
     dailyQuote: "今日名言",
     streakDetail: "今天是第 {n} 天连胜，EXP +{e}"
   },
-  settings: { title: '设置', proTitle: 'FocusFlow Pro', proDesc: '云端同步 & 支持开发', viewOffer: '查看详情', proMember: 'Pro 会员', thanks: '感谢支持！', cloudSync: '云同步', enableCloud: '开启云同步', signOut: '退出登录', timerConfig: '计时器配置', focusDuration: '专注时长', shortBreak: '短休息', longBreak: '长休息', intervals: '每轮番茄数', language: '语言', support: '支持', restore: '恢复购买', privacy: '隐私政策', reset: '重置', choosePlan: '选择方案', recurring: '自动续费。', subscribe: '订阅', notifications: '通知提醒', addNotification: '添加时间', notifyAt: '提醒时间', performance: '性能模式', powerSaver: '省电模式', powerSaverDesc: '节省电量。' },
+  settings: { title: '设置', proTitle: 'FocusFlow Pro', proDesc: '云端同步 & 支持开发', viewOffer: '查看详情', proMember: 'Pro 会员', thanks: '感谢支持！', cloudSync: '云同步', enableCloud: '开启云同步', signOut: '退出登录', timerConfig: '计时器配置', focusDuration: '专注时长', shortBreak: '短休息', longBreak: '长休息', intervals: '每轮番茄数', language: '语言', support: '支持', restore: '恢复购买', privacy: '隐私政策', reset: '重置', choosePlan: '选择方案', recurring: '自动续费。', subscribe: '订阅', notifications: '通知提醒', addNotification: '添加时间', notifyAt: '提醒时间', performance: '性能模式', powerSaver: '省电模式', powerSaverDesc: '节省电量。', appearance: '外观', theme: '主题', theme_system: '跟随系统', theme_light: '浅色', theme_dark: '深色' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: '多端同步', feat_history: '无限统计', feat_skins: '限定皮肤', feat_noise: '白噪音', feat_support: '支持作者 ❤️', monthly_name: '月度', monthly_desc: '按月付费。', yearly_name: '年度', yearly_desc: '超值价格。', yearly_tag: '省 45%', lifetime_name: '终身', lifetime_desc: '一次买断。', lifetime_tag: '最超值' },
-  session: { complete: '专注完成！', focusedFor: '你保持专注了', minutes: '分钟', avgFocus: '平均度', posture: '体态', timeline: '时间轴', cycleLog: '日志', backHome: '返回主页', recharge: '充电中', rest: '休息时间', breathe: '深呼吸', skipBreak: '跳过', paused: '已暂停', focusGuard: '卫士', proPosture: '体态', fullBodyAi: '全身 AI', focusTime: '专注', taskCompleted: '任务完成', markAsDone: '标记完成？', sessionDoneAuto: '自动保存', sessionDoneManual: '保存结果？', earlyStop: '提前结束' }
+  session: { complete: '专注完成！', focusedFor: '你保持专注了', minutes: '分钟', avgFocus: '平均度', posture: '体态', timeline: '时间轴', cycleLog: '日志', backHome: '返回主页', recharge: '充电中', rest: '休息时间', breathe: '深呼吸', skipBreak: '跳过', paused: '已暂停', focusGuard: '卫士', proPosture: '体态', fullBodyAi: '全身 AI', focusTime: '专注', taskCompleted: '任务完成', markAsDone: '标记完成？', sessionDoneAuto: '自动保存', sessionDoneManual: '保存结果？', earlyStop: '提前结束', tooClose: '距离太近' },
+  sound: { title: '背景音效', smartVolume: '智能音量调节', smartVolumeDesc: '检测到分心时自动降低音量', timerOnly: '仅计时时', alwaysOn: '始终开启', frequency: '频率', ambience: '氛围', custom: '自定义', upload: '上传', off: '关闭' }
 };
 
 // 3. TRADITIONAL CHINESE
 const zhTW = {
+  ...en,
   common: { confirm: '確認', cancel: '取消', back: '返回', save: '保存', delete: '刪除', loading: '加載中...' },
   nav: { timer: '計時', tasks: '任務', stats: '統計', settings: '設置' },
   timer: { ready: '準備專注', estCycle: '預計時長', focusTime: '專注時長', break: '休息', start: '開始', pause: '暫停', resume: '繼續', stopwatchActive: '正計時模式運行中', noTasks: '暫無進行中的任務', addOne: '去任務頁添加一個吧', selectTask: '選擇任務', startLabel: '開始', duration: '時長', pomos: '番茄數', mode_pomodoro: '番茄鐘', mode_stopwatch: '正計時', mode_custom: '自定義' },
@@ -152,14 +154,16 @@ const zhTW = {
     dailyQuote: "今日名言",
     streakDetail: "今天是第 {n} 天連勝，EXP +{e}"
   },
-  settings: { title: '設置', proTitle: 'FocusFlow Pro', proDesc: '雲端同步 & 支持開發', viewOffer: '查看詳情', proMember: 'Pro 會員', thanks: '感謝支持！', cloudSync: '雲同步', enableCloud: '開啓雲同步', signOut: '退出登錄', timerConfig: '計時器配置', focusDuration: '專注時長', shortBreak: '短休息', longBreak: '長休息', intervals: '每輪番茄數', language: '語言', support: '支持', restore: '恢復購買', privacy: '隱私政策', reset: '重置', choosePlan: '選擇方案', recurring: '自動續費。', subscribe: '訂閱', notifications: '通知提醒', addNotification: '添加時間', notifyAt: '提醒時間', performance: '性能模式', powerSaver: '省電模式', powerSaverDesc: '節省電量。' },
+  settings: { title: '設置', proTitle: 'FocusFlow Pro', proDesc: '雲端同步 & 支持開發', viewOffer: '查看詳情', proMember: 'Pro 會員', thanks: '感謝支持！', cloudSync: '雲同步', enableCloud: '開啓雲同步', signOut: '退出登錄', timerConfig: '計時器配置', focusDuration: '專注時長', shortBreak: '短休息', longBreak: '長休息', intervals: '每輪番茄數', language: '語言', support: '支持', restore: '恢復購買', privacy: '隱私政策', reset: '重置', choosePlan: '選擇方案', recurring: '自動續費。', subscribe: '訂閱', notifications: '通知提醒', addNotification: '添加時間', notifyAt: '提醒時間', performance: '性能模式', powerSaver: '省電模式', powerSaverDesc: '節省電量。', appearance: '外觀', theme: '主題', theme_system: '跟隨系統', theme_light: '淺色', theme_dark: '深色' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: '多端同步', feat_history: '無限統計', feat_skins: '限定皮膚', feat_noise: '白噪音', feat_support: '支持作者 ❤️', monthly_name: '月度', monthly_desc: '按月付費。', yearly_name: '年度', yearly_desc: '超值價格。', yearly_tag: '省 45%', lifetime_name: '終身', lifetime_desc: '一次買斷。', lifetime_tag: '最超值' },
-  session: { complete: '專注完成！', focusedFor: '你保持專注了', minutes: '分鐘', avgFocus: '平均度', posture: '體態', timeline: '時間軸', cycleLog: '日誌', backHome: '返回主頁', recharge: '充電中', rest: '休息時間', breathe: '深呼吸', skipBreak: '跳過', paused: '已暫停', focusGuard: '衛士', proPosture: '體態', fullBodyAi: '全身 AI', focusTime: '專注', taskCompleted: '任務完成', markAsDone: '標記完成？', sessionDoneAuto: '自動保存', sessionDoneManual: '保存結果？', earlyStop: '提前結束' }
+  session: { complete: '專注完成！', focusedFor: '你保持專注了', minutes: '分鐘', avgFocus: '平均度', posture: '體態', timeline: '時間軸', cycleLog: '日誌', backHome: '返回主頁', recharge: '充電中', rest: '休息時間', breathe: '深呼吸', skipBreak: '跳過', paused: '已暫停', focusGuard: '衛士', proPosture: '體態', fullBodyAi: '全身 AI', focusTime: '專注', taskCompleted: '任務完成', markAsDone: '標記完成？', sessionDoneAuto: '自動保存', sessionDoneManual: '保存結果？', earlyStop: '提前結束', tooClose: '距離太近' },
+  sound: { title: '背景音效', smartVolume: '智能音量調節', smartVolumeDesc: '檢測到分心時自動降低音量', timerOnly: '僅計時時', alwaysOn: '始終開啓', frequency: '頻率', ambience: '環境音', custom: '自定義', upload: '上傳', off: '關閉' }
 };
 
 // 4. KOREAN
 const ko = {
+  ...en,
   common: { confirm: '확인', cancel: '취소', back: '뒤로', save: '저장', delete: '삭제', loading: '로딩 중...' },
   nav: { timer: '타이머', tasks: '작업', stats: '통계', settings: '설정' },
   timer: { ready: '몰입 준비', estCycle: '예상 시간', focusTime: '몰입 시간', break: '휴식', start: '시작', pause: '일시정지', resume: '재개', stopwatchActive: '스톱워치 모드 실행 중', noTasks: '진행 중인 작업 없음', addOne: '작업 탭에서 추가하세요', selectTask: '작업 선택', startLabel: '시작', duration: '기간', pomos: '뽀모도르', mode_pomodoro: '뽀모도르', mode_stopwatch: '스톱워치', mode_custom: '커스텀' },
@@ -203,14 +207,16 @@ const ko = {
     dailyQuote: "오늘의 명언",
     streakDetail: "{n}일 연속, EXP +{e}"
   },
-  settings: { title: '설정', proTitle: 'FocusFlow Pro', proDesc: '데이터 동기화 및 개발 지원', viewOffer: '제안 보기', proMember: 'Pro 멤버', thanks: '감사합니다!', cloudSync: '클라우드 동기화', enableCloud: '동기화 활성화', signOut: '로그아웃', timerConfig: '타이머 설정', focusDuration: '몰입 시간', shortBreak: '짧은 휴식', longBreak: '긴 휴식', intervals: '세션 수', language: '언어', support: '지원', restore: '구매 복원', privacy: '개인정보 정책', reset: '초기화', choosePlan: '플랜 선택', recurring: '정기 결제됩니다.', subscribe: '구독하기', notifications: '알림', addNotification: '시간 추가', notifyAt: '알림 시간', performance: '성능', powerSaver: '절전 모드', powerSaverDesc: '배터리를 절약합니다.' },
+  settings: { title: '설정', proTitle: 'FocusFlow Pro', proDesc: '데이터 동기화 및 개발 지원', viewOffer: '제안 보기', proMember: 'Pro 멤버', thanks: '감사합니다!', cloudSync: '클라우드 동기화', enableCloud: '동기화 활성화', signOut: '로그아웃', timerConfig: '타이머 설정', focusDuration: '몰입 시간', shortBreak: '짧은 휴식', longBreak: '긴 휴식', intervals: '세션 수', language: '언어', support: '지원', restore: '구매 복원', privacy: '개인정보 정책', reset: '초기화', choosePlan: '플랜 선택', recurring: '정기 결제됩니다.', subscribe: '구독하기', notifications: '알림', addNotification: '시간 추가', notifyAt: '알림 시간', performance: '성능', powerSaver: '절전 모드', powerSaverDesc: '배터리를 절약합니다.', appearance: '화면', theme: '테마', theme_system: '시스템 설정', theme_light: '라이트', theme_dark: '다크' },
   footer: { version: 'FocusFlow v1.5.0', architecture: '로컬 우선' },
   premium: { feat_sync: '기기 동기화', feat_history: '무제한 통계', feat_skins: '한정 스킨', feat_noise: '백색 소음', feat_support: '개발자 후원 ❤️', monthly_name: '월간', monthly_desc: '매월 결제.', yearly_name: '연간', yearly_desc: '최고의 가격.', yearly_tag: '45% 할인', lifetime_name: '평생', lifetime_desc: '한 번 결제.', lifetime_tag: '최고 가치' },
-  session: { complete: '몰입 완료!', focusedFor: '집중한 시간', minutes: '분', avgFocus: '평균 몰입도', posture: '자세', timeline: '타임라인', cycleLog: '기록', backHome: '홈으로', recharge: '충전 중', rest: '휴식 시간', breathe: '심호흡을 하세요', skipBreak: '휴식 건너뛰기', paused: '일시정지됨', focusGuard: '가드', proPosture: 'Pro: 자세', fullBodyAi: '전신 AI', focusTime: '몰입', taskCompleted: '작업 완료', markAsDone: '완료로 표시?', sessionDoneAuto: '자동 저장됨', sessionDoneManual: '결과를 저장할까요?', earlyStop: '조기 종료' }
+  session: { complete: '몰입 완료!', focusedFor: '집중한 시간', minutes: '분', avgFocus: '평균 몰입도', posture: '자세', timeline: '타임라인', cycleLog: '기록', backHome: '홈으로', recharge: '충전 중', rest: '휴식 시간', breathe: '심호흡을 하세요', skipBreak: '휴식 건너뛰기', paused: '일시정지됨', focusGuard: '가드', proPosture: 'Pro: 자세', fullBodyAi: '전신 AI', focusTime: '몰입', taskCompleted: '작업 완료', markAsDone: '완료로 표시?', sessionDoneAuto: '자동 저장됨', sessionDoneManual: '결과를 저장할까요?', earlyStop: '조기 종료', tooClose: '너무 가까움' },
+  sound: { title: '배경 사운드', smartVolume: '스마트 볼륨 조절', smartVolumeDesc: '집중력 저하 시 볼륨 감소', timerOnly: '타이머 전용', alwaysOn: '항상 켜기', frequency: '주파수', ambience: '배경음', custom: '사용자 지정', upload: '업로드', off: '끔' }
 };
 
 // 5. JAPANESE
 const ja = {
+  ...en,
   common: { confirm: '確認', cancel: 'キャンセル', back: '戻る', save: '保存', delete: '削除', loading: '読み込み中...' },
   nav: { timer: 'タイマー', tasks: 'タスク', stats: '統計', settings: '設定' },
   timer: { ready: '集中する準備', estCycle: '予想サイクル', focusTime: '集中時間', break: '休憩', start: '開始', pause: '一時停止', resume: '再開', stopwatchActive: 'ストップウォッチモード', noTasks: 'アクティブなタスクなし', addOne: 'タスクタブで追加してください', selectTask: 'タスクを選択', startLabel: '開始', duration: '期間', pomos: 'ポモドーロ', mode_pomodoro: 'ポモドーロ', mode_stopwatch: 'ストップウォッチ', mode_custom: 'カスタム' },
@@ -254,14 +260,16 @@ const ja = {
     dailyQuote: "今日の名言",
     streakDetail: "連続{n}日, EXP +{e}"
   },
-  settings: { title: '設定', proTitle: 'FocusFlow Pro', proDesc: 'データ同期 & 開発支援', viewOffer: '詳細を見る', proMember: 'Pro メンバー', thanks: 'ありがとうございます！', cloudSync: 'クラウド同期', enableCloud: '同期を有効化', signOut: 'サインアウト', timerConfig: 'タイマー設定', focusDuration: '集中時間', shortBreak: '短い休憩', longBreak: '長い休憩', intervals: 'ポモドーロ数', language: '言語', support: 'サポート', restore: '購入を復元', privacy: 'プライバシー', reset: 'リセット', choosePlan: 'プランを選択', recurring: '定期請求', subscribe: '登録する', notifications: '通知', addNotification: '時間を追加', notifyAt: '通知時間', performance: 'パフォーマンス', powerSaver: '省電力モード', powerSaverDesc: 'バッテリーを節約します。' },
+  settings: { title: '設定', proTitle: 'FocusFlow Pro', proDesc: 'データ同期 & 開発支援', viewOffer: '詳細を見る', proMember: 'Pro メンバー', thanks: 'ありがとうございます！', cloudSync: 'クラウド同期', enableCloud: '同期を有効化', signOut: 'サインアウト', timerConfig: 'タイマー設定', focusDuration: '集中時間', shortBreak: '短い休憩', longBreak: '長い休憩', intervals: 'ポモドーロ数', language: '言語', support: 'サポート', restore: '購入を復元', privacy: 'プライバシー', reset: 'リセット', choosePlan: 'プランを選択', recurring: '定期請求', subscribe: '登録する', notifications: '通知', addNotification: '時間を追加', notifyAt: '通知時間', performance: 'パフォーマンス', powerSaver: '省電力モード', powerSaverDesc: 'バッテリーを節約します。', appearance: '外観', theme: 'テーマ', theme_system: 'システム', theme_light: 'ライト', theme_dark: 'ダーク' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'ローカル優先' },
   premium: { feat_sync: 'デバイス同期', feat_history: '無制限の統計', feat_skins: '限定スキン', feat_noise: 'ホワイトノイズ', feat_support: '開発者をサポート ❤️', monthly_name: '月額', monthly_desc: '毎月請求', yearly_name: '年額', yearly_desc: 'ベストプライス', yearly_tag: '45% OFF', lifetime_name: '生涯', lifetime_desc: '一回払い', lifetime_tag: '最高価値' },
-  session: { complete: '完了！', focusedFor: '集中時間', minutes: '分', avgFocus: '平均', posture: '姿勢', timeline: 'タイムライン', cycleLog: 'ログ', backHome: 'ホーム', recharge: '充電中', rest: '休憩', breathe: '深呼吸', skipBreak: 'スキップ', paused: '一時停止', focusGuard: 'ガード', proPosture: '姿勢', fullBodyAi: '全身 AI', focusTime: '集中', taskCompleted: '完了', markAsDone: '完了にしますか？', sessionDoneAuto: '自動保存', sessionDoneManual: '保存しますか？', earlyStop: '停止' }
+  session: { complete: '完了！', focusedFor: '集中時間', minutes: '分', avgFocus: '平均', posture: '姿勢', timeline: 'タイムライン', cycleLog: 'ログ', backHome: 'ホーム', recharge: '充電中', rest: '休憩', breathe: '深呼吸', skipBreak: 'スキップ', paused: '一時停止', focusGuard: 'ガード', proPosture: '姿勢', fullBodyAi: '全身 AI', focusTime: '集中', taskCompleted: '完了', markAsDone: '完了にしますか？', sessionDoneAuto: '自動保存', sessionDoneManual: '保存しますか？', earlyStop: '停止', tooClose: '近すぎる' },
+  sound: { title: '背景音', smartVolume: 'スマート音量調整', smartVolumeDesc: '集中力が低下すると音量を下げます', timerOnly: 'タイマーのみ', alwaysOn: '常にオン', frequency: '周波数', ambience: '環境音', custom: 'カスタム', upload: 'アップロード', off: 'オフ' }
 };
 
 // 6. FRENCH
 const fr = {
+  ...en,
   common: { confirm: 'Confirmer', cancel: 'Annuler', back: 'Retour', save: 'Enregistrer', delete: 'Supprimer', loading: 'Chargement...' },
   nav: { timer: 'Minuteur', tasks: 'Tâches', stats: 'Stats', settings: 'Paramètres' },
   timer: { ready: 'Prêt à concentrer', estCycle: 'Cycle est.', focusTime: 'Temps Focus', break: 'Pause', start: 'Démarrer', pause: 'Pause', resume: 'Reprendre', stopwatchActive: 'Chronomètre actif', noTasks: 'Aucune tâche active', addOne: 'Ajoutez-en une dans l\'onglet Tâches', selectTask: 'Choisir une tâche', startLabel: 'DÉPART', duration: 'DURÉE', pomos: 'POMOS', mode_pomodoro: 'Pomodoro', mode_stopwatch: 'Chronomètre', mode_custom: 'Perso' },
@@ -305,14 +313,16 @@ const fr = {
     dailyQuote: "Citation",
     streakDetail: "Jour {n}, EXP +{e}"
   },
-  settings: { title: 'Paramètres', proTitle: 'FocusFlow Pro', proDesc: 'Synchro & Soutien dev.', viewOffer: 'Voir l\'offre', proMember: 'Membre Pro', thanks: 'Merci !', cloudSync: 'Cloud Sync', enableCloud: 'Activer Cloud', signOut: 'Déconnexion', timerConfig: 'Config Minuteur', focusDuration: 'Focus', shortBreak: 'Pause Courte', longBreak: 'Pause Longue', intervals: 'Pomos', language: 'Langue', support: 'Support', restore: 'Restaurer', privacy: 'Confidentialité', reset: 'Réinitialiser', choosePlan: 'Choisir un plan', recurring: 'Facturation récurrente.', subscribe: 'S\'abonner', notifications: 'Notifications', addNotification: 'Ajouter', notifyAt: 'Notifier à', performance: 'Performance', powerSaver: 'Économie d\'énergie', powerSaverDesc: 'Économise la batterie.' },
+  settings: { title: 'Paramètres', proTitle: 'FocusFlow Pro', proDesc: 'Synchro & Soutien dev.', viewOffer: 'Voir l\'offre', proMember: 'Membre Pro', thanks: 'Merci !', cloudSync: 'Cloud Sync', enableCloud: 'Activer Cloud', signOut: 'Déconnexion', timerConfig: 'Config Minuteur', focusDuration: 'Focus', shortBreak: 'Pause Courte', longBreak: 'Pause Longue', intervals: 'Pomos', language: 'Langue', support: 'Support', restore: 'Restaurer', privacy: 'Confidentialité', reset: 'Réinitialiser', choosePlan: 'Choisir un plan', recurring: 'Facturation récurrente.', subscribe: 'S\'abonner', notifications: 'Notifications', addNotification: 'Ajouter', notifyAt: 'Notifier à', performance: 'Performance', powerSaver: 'Économie d\'énergie', powerSaverDesc: 'Économise la batterie.', appearance: 'Apparence', theme: 'Thème', theme_system: 'Système', theme_light: 'Clair', theme_dark: 'Sombre' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'Synchro Appareils', feat_history: 'Stats Illimitées', feat_skins: 'Skins Renard', feat_noise: 'Bruit Blanc', feat_support: 'Soutien Dev ❤️', monthly_name: 'Mensuel', monthly_desc: 'Facturé au mois.', yearly_name: 'Annuel', yearly_desc: 'Meilleur prix.', yearly_tag: '-45%', lifetime_name: 'À vie', lifetime_desc: 'Paiement unique.', lifetime_tag: 'TOP' },
-  session: { complete: 'Terminé !', focusedFor: 'Concentré pendant', minutes: 'min', avgFocus: 'Moy', posture: 'Posture', timeline: 'Chronologie', cycleLog: 'Journal', backHome: 'Accueil', recharge: 'Recharge', rest: 'Repos', breathe: 'Respirer', skipBreak: 'Passer', paused: 'En pause', focusGuard: 'Garde', proPosture: 'Posture', fullBodyAi: 'IA Corps', focusTime: 'Focus', taskCompleted: 'Fait', markAsDone: 'Marquer fait ?', sessionDoneAuto: 'Auto-sauvegardé', sessionDoneManual: 'Sauvegarder ?', earlyStop: 'Arrêté' }
+  session: { complete: 'Terminé !', focusedFor: 'Concentré pendant', minutes: 'min', avgFocus: 'Moy', posture: 'Posture', timeline: 'Chronologie', cycleLog: 'Journal', backHome: 'Accueil', recharge: 'Recharge', rest: 'Repos', breathe: 'Respirer', skipBreak: 'Passer', paused: 'En pause', focusGuard: 'Garde', proPosture: 'Posture', fullBodyAi: 'IA Corps', focusTime: 'Focus', taskCompleted: 'Fait', markAsDone: 'Marquer fait ?', sessionDoneAuto: 'Auto-sauvegardé', sessionDoneManual: 'Sauvegarder ?', earlyStop: 'Arrêté', tooClose: 'Trop près' },
+  sound: { title: 'Audio de fond', smartVolume: 'Volume Adaptatif', smartVolumeDesc: 'Baisse le volume quand distrait.', timerOnly: 'Minuteur Seul', alwaysOn: 'Toujours Actif', frequency: 'Fréquence', ambience: 'Ambiance', custom: 'Perso', upload: 'Upload', off: 'Désactivé' }
 };
 
 // 7. SPANISH
 const es = {
+  ...en,
   common: { confirm: 'Confirmar', cancel: 'Cancelar', back: 'Volver', save: 'Guardar', delete: 'Eliminar', loading: 'Cargando...' },
   nav: { timer: 'Tempo.', tasks: 'Tareas', stats: 'Estad.', settings: 'Ajustes' },
   timer: { ready: 'Listo para concentrarse', estCycle: 'Ciclo Est.', focusTime: 'Tiempo Foco', break: 'Descanso', start: 'Iniciar', pause: 'Pausa', resume: 'Reanudar', stopwatchActive: 'Cronómetro Activo', noTasks: 'Sin tareas activas', addOne: 'Añade una en Tareas', selectTask: 'Elegir Tarea', startLabel: 'INICIO', duration: 'DURACIÓN', pomos: 'POMOS', mode_pomodoro: 'Pomodoro', mode_stopwatch: 'Cronómetro', mode_custom: 'Personalizado' },
@@ -356,14 +366,16 @@ const es = {
     dailyQuote: "Cita del día",
     streakDetail: "Día {n}, EXP +{e}"
   },
-  settings: { title: 'Ajustes', proTitle: 'FocusFlow Pro', proDesc: 'Sincronización y soporte.', viewOffer: 'Ver Oferta', proMember: 'Miembro Pro', thanks: '¡Gracias!', cloudSync: 'Nube', enableCloud: 'Activar Sync', signOut: 'Cerrar Sesión', timerConfig: 'Configurar Temp.', focusDuration: 'Foco', shortBreak: 'Descanso Corto', longBreak: 'Descanso Largo', intervals: 'Pomos', language: 'Idioma', support: 'Soporte', restore: 'Restaurar', privacy: 'Privacidad', reset: 'Reiniciar', choosePlan: 'Elige un plan', recurring: 'Facturación recurrente.', subscribe: 'Suscribirse', notifications: 'Notificaciones', addNotification: 'Añadir', notifyAt: 'Notificar a', performance: 'Rendimiento', powerSaver: 'Ahorro Energía', powerSaverDesc: 'Ahorra batería.' },
+  settings: { title: 'Ajustes', proTitle: 'FocusFlow Pro', proDesc: 'Sincronización y soporte.', viewOffer: 'Ver Oferta', proMember: 'Miembro Pro', thanks: '¡Gracias!', cloudSync: 'Nube', enableCloud: 'Activar Sync', signOut: 'Cerrar Sesión', timerConfig: 'Configurar Temp.', focusDuration: 'Foco', shortBreak: 'Descanso Corto', longBreak: 'Descanso Largo', intervals: 'Pomos', language: 'Idioma', support: 'Soporte', restore: 'Restaurar', privacy: 'Privacidad', reset: 'Reiniciar', choosePlan: 'Elige un plan', recurring: 'Facturación recurrente.', subscribe: 'Suscribirse', notifications: 'Notificaciones', addNotification: 'Añadir', notifyAt: 'Notificar a', performance: 'Rendimiento', powerSaver: 'Ahorro Energía', powerSaverDesc: 'Ahorra batería.', appearance: 'Apariencia', theme: 'Tema', theme_system: 'Sistema', theme_light: 'Claro', theme_dark: 'Oscuro' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'Sincronizar Disp.', feat_history: 'Estadísticas Ilimitadas', feat_skins: 'Skins de Zorro', feat_noise: 'Ruido Blanco', feat_support: 'Apoya al Dev ❤️', monthly_name: 'Mensual', monthly_desc: 'Cobro mensual.', yearly_name: 'Anual', yearly_desc: 'Mejor precio.', yearly_tag: 'AHORRA 45%', lifetime_name: 'De por vida', lifetime_desc: 'Pago único.', lifetime_tag: 'VALOR' },
-  session: { complete: '¡Hecho!', focusedFor: 'Concentrado por', minutes: 'min', avgFocus: 'Prom', posture: 'Postura', timeline: 'Línea de tiempo', cycleLog: 'Log', backHome: 'Inicio', recharge: 'Recarga', rest: 'Descanso', breathe: 'Respirar', skipBreak: 'Saltar', paused: 'Pausado', focusGuard: 'Guardia', proPosture: 'Postura', fullBodyAi: 'IA Corporal', focusTime: 'Foco', taskCompleted: 'Hecho', markAsDone: '¿Marcar hecho?', sessionDoneAuto: 'Auto-guardado', sessionDoneManual: '¿Guardar?', earlyStop: 'Detenido' }
+  session: { complete: '¡Hecho!', focusedFor: 'Concentrado por', minutes: 'min', avgFocus: 'Prom', posture: 'Postura', timeline: 'Línea de tiempo', cycleLog: 'Log', backHome: 'Inicio', recharge: 'Recarga', rest: 'Descanso', breathe: 'Respirar', skipBreak: 'Saltar', paused: 'Pausado', focusGuard: 'Guardia', proPosture: 'Postura', fullBodyAi: 'IA Corporal', focusTime: 'Foco', taskCompleted: 'Hecho', markAsDone: '¿Marcar hecho?', sessionDoneAuto: 'Auto-guardado', sessionDoneManual: '¿Guardar?', earlyStop: 'Detenido', tooClose: 'Demasiado cerca' },
+  sound: { title: 'Audio de Fondo', smartVolume: 'Volumen Adaptativo', smartVolumeDesc: 'Baja el volumen al distraerse.', timerOnly: 'Solo Temporizador', alwaysOn: 'Siempre Activo', frequency: 'Frecuencia', ambience: 'Ambiente', custom: 'Personalizado', upload: 'Subir', off: 'Apagado' }
 };
 
 // 8. GERMAN
 const de = {
+  ...en,
   common: { confirm: 'Bestätigen', cancel: 'Abbrechen', back: 'Zurück', save: 'Speichern', delete: 'Löschen', loading: 'Laden...' },
   nav: { timer: 'Timer', tasks: 'Aufgaben', stats: 'Statistik', settings: 'Einst.' },
   timer: { ready: 'Bereit zum Fokus', estCycle: 'Gesch. Zyklus', focusTime: 'Fokuszeit', break: 'Pause', start: 'Start', pause: 'Pause', resume: 'Weiter', stopwatchActive: 'Stoppuhr aktiv', noTasks: 'Keine aktiven Aufgaben', addOne: 'Füge eine im Tab Aufgaben hinzu', selectTask: 'Aufgabe wählen', startLabel: 'START', duration: 'DAUER', pomos: 'POMOS', mode_pomodoro: 'Pomodoro', mode_stopwatch: 'Stoppuhr', mode_custom: 'Benutzerdef.' },
@@ -407,14 +419,16 @@ const de = {
     dailyQuote: "Zitat",
     streakDetail: "Tag {n}, EXP +{e}"
   },
-  settings: { title: 'Einstellungen', proTitle: 'FocusFlow Pro', proDesc: 'Sync & Support.', viewOffer: 'Angebot ansehen', proMember: 'Pro Mitglied', thanks: 'Danke!', cloudSync: 'Cloud Sync', enableCloud: 'Sync aktivieren', signOut: 'Abmelden', timerConfig: 'Timer Konfig', focusDuration: 'Fokus', shortBreak: 'Kurze Pause', longBreak: 'Lange Pause', intervals: 'Pomos', language: 'Sprache', support: 'Hilfe', restore: 'Wiederherstellen', privacy: 'Datenschutz', reset: 'Zurücksetzen', choosePlan: 'Plan wählen', recurring: 'Wiederkehrende Abrechnung.', subscribe: 'Abonnieren', notifications: 'Benachrichtigungen', addNotification: 'Zeit hinzufügen', notifyAt: 'Benachrichtigen um', performance: 'Leistung', powerSaver: 'Energiesparmodus', powerSaverDesc: 'Spart Akku.' },
+  settings: { title: 'Einstellungen', proTitle: 'FocusFlow Pro', proDesc: 'Sync & Support.', viewOffer: 'Angebot ansehen', proMember: 'Pro Mitglied', thanks: 'Danke!', cloudSync: 'Cloud Sync', enableCloud: 'Sync aktivieren', signOut: 'Abmelden', timerConfig: 'Timer Konfig', focusDuration: 'Fokus', shortBreak: 'Kurze Pause', longBreak: 'Lange Pause', intervals: 'Pomos', language: 'Sprache', support: 'Hilfe', restore: 'Wiederherstellen', privacy: 'Datenschutz', reset: 'Zurücksetzen', choosePlan: 'Plan wählen', recurring: 'Wiederkehrende Abrechnung.', subscribe: 'Abonnieren', notifications: 'Benachrichtigungen', addNotification: 'Zeit hinzufügen', notifyAt: 'Benachrichtigen um', performance: 'Leistung', powerSaver: 'Energiesparmodus', powerSaverDesc: 'Spart Akku.', appearance: 'Aussehen', theme: 'Thema', theme_system: 'System', theme_light: 'Hell', theme_dark: 'Dunkel' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'Geräte Sync', feat_history: 'Unbegrenzte Statistik', feat_skins: 'Fuchs Skins', feat_noise: 'Weißes Rauschen', feat_support: 'Entwickler unterstützen ❤️', monthly_name: 'Monatlich', monthly_desc: 'Monatliche Abrechnung.', yearly_name: 'Jährlich', yearly_desc: 'Bester Preis.', yearly_tag: 'SPARE 45%', lifetime_name: 'Lebenslang', lifetime_desc: 'Einmalzahlung.', lifetime_tag: 'WERT' },
-  session: { complete: 'Fertig!', focusedFor: 'Fokussiert für', minutes: 'min', avgFocus: 'Ø', posture: 'Haltung', timeline: 'Zeitstrahl', cycleLog: 'Log', backHome: 'Home', recharge: 'Aufladen', rest: 'Ausruhen', breathe: 'Atmen', skipBreak: 'Überspringen', paused: 'Pausiert', focusGuard: 'Wächter', proPosture: 'Haltung', fullBodyAi: 'Körper-AI', focusTime: 'Fokus', taskCompleted: 'Erledigt', markAsDone: 'Als erledigt markieren?', sessionDoneAuto: 'Auto-gespeichert', sessionDoneManual: 'Speichern?', earlyStop: 'Gestoppt' }
+  session: { complete: 'Fertig!', focusedFor: 'Fokussiert für', minutes: 'min', avgFocus: 'Ø', posture: 'Haltung', timeline: 'Zeitstrahl', cycleLog: 'Log', backHome: 'Home', recharge: 'Aufladen', rest: 'Ausruhen', breathe: 'Atmen', skipBreak: 'Überspringen', paused: 'Pausiert', focusGuard: 'Wächter', proPosture: 'Haltung', fullBodyAi: 'Körper-AI', focusTime: 'Fokus', taskCompleted: 'Erledigt', markAsDone: 'Als erledigt markieren?', sessionDoneAuto: 'Auto-gespeichert', sessionDoneManual: 'Speichern?', earlyStop: 'Gestoppt', tooClose: 'Zu nah' },
+  sound: { title: 'Hintergrundaudio', smartVolume: 'Adaptive Lautstärke', smartVolumeDesc: 'Senkt Lautstärke bei Ablenkung.', timerOnly: 'Nur Timer', alwaysOn: 'Immer an', frequency: 'Frequenz', ambience: 'Ambiente', custom: 'Benutzerdef.', upload: 'Upload', off: 'Aus' }
 };
 
 // 9. RUSSIAN
 const ru = {
+  ...en,
   common: { confirm: 'ОК', cancel: 'Отмена', back: 'Назад', save: 'Сохранить', delete: 'Удалить', loading: 'Загрузка...' },
   nav: { timer: 'Таймер', tasks: 'Задачи', stats: 'Стат.', settings: 'Настр.' },
   timer: { ready: 'Готов к фокусу', estCycle: 'Расч. цикл', focusTime: 'Время фокуса', break: 'Перерыв', start: 'Старт', pause: 'Пауза', resume: 'Продолжить', stopwatchActive: 'Секундомер активен', noTasks: 'Нет активных задач', addOne: 'Добавьте задачу', selectTask: 'Выбрать задачу', startLabel: 'СТАРТ', duration: 'ДЛИТЕЛЬНОСТЬ', pomos: 'ПОМОДОРЫ', mode_pomodoro: 'Помодоро', mode_stopwatch: 'Секундомер', mode_custom: 'Свой' },
@@ -458,14 +472,16 @@ const ru = {
     dailyQuote: "Цитата",
     streakDetail: "День {n}, EXP +{e}"
   },
-  settings: { title: 'Настройки', proTitle: 'FocusFlow Pro', proDesc: 'Синхронизация и поддержка.', viewOffer: 'Посмотреть', proMember: 'Pro Участник', thanks: 'Спасибо!', cloudSync: 'Облако', enableCloud: 'Вкл. Синхронизацию', signOut: 'Выйти', timerConfig: 'Настр. Таймера', focusDuration: 'Фокус', shortBreak: 'Короткий перерыв', longBreak: 'Длинный перерыв', intervals: 'Помодоры', language: 'Язык', support: 'Поддержка', restore: 'Восстановить', privacy: 'Конфиденциальность', reset: 'Сброс', choosePlan: 'Выберите план', recurring: 'Автопродление.', subscribe: 'Подписаться', notifications: 'Уведомления', addNotification: 'Добавить', notifyAt: 'Напомнить в', performance: 'Производительность', powerSaver: 'Экономия энергии', powerSaverDesc: 'Экономит батарею.' },
+  settings: { title: 'Настройки', proTitle: 'FocusFlow Pro', proDesc: 'Синхронизация и поддержка.', viewOffer: 'Посмотреть', proMember: 'Pro Участник', thanks: 'Спасибо!', cloudSync: 'Облако', enableCloud: 'Вкл. Синхронизацию', signOut: 'Выйти', timerConfig: 'Настр. Таймера', focusDuration: 'Фокус', shortBreak: 'Короткий перерыв', longBreak: 'Длинный перерыв', intervals: 'Помодоры', language: 'Язык', support: 'Поддержка', restore: 'Восстановить', privacy: 'Конфиденциальность', reset: 'Сброс', choosePlan: 'Выберите план', recurring: 'Автопродление.', subscribe: 'Подписаться', notifications: 'Уведомления', addNotification: 'Добавить', notifyAt: 'Напомнить в', performance: 'Производительность', powerSaver: 'Экономия энергии', powerSaverDesc: 'Экономит батарею.', appearance: 'Внешний вид', theme: 'Тема', theme_system: 'Системная', theme_light: 'Светлая', theme_dark: 'Темная' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'Синхронизация', feat_history: 'Вся статистика', feat_skins: 'Скины лисы', feat_noise: 'Белый шум', feat_support: 'Поддержка ❤️', monthly_name: 'Месячный', monthly_desc: 'Оплата раз в месяц.', yearly_name: 'Годовой', yearly_desc: 'Лучшая цена.', yearly_tag: '-45%', lifetime_name: 'Навсегда', lifetime_desc: 'Один платеж.', lifetime_tag: 'ТОП' },
-  session: { complete: 'Готово!', focusedFor: 'Фокус в течение', minutes: 'мин', avgFocus: 'Ср.', posture: 'Осанка', timeline: 'График', cycleLog: 'Лог', backHome: 'Домой', recharge: 'Зарядка', rest: 'Отдых', breathe: 'Дышите', skipBreak: 'Пропустить', paused: 'Пауза', focusGuard: 'Страж', proPosture: 'Осанка', fullBodyAi: 'ИИ Тела', focusTime: 'Фокус', taskCompleted: 'Готово', markAsDone: 'Отметить как готовое?', sessionDoneAuto: 'Автосохранение', sessionDoneManual: 'Сохранить?', earlyStop: 'Остановлено' }
+  session: { complete: 'Готово!', focusedFor: 'Фокус в течение', minutes: 'мин', avgFocus: 'Ср.', posture: 'Осанка', timeline: 'График', cycleLog: 'Лог', backHome: 'Домой', recharge: 'Зарядка', rest: 'Отдых', breathe: 'Дышите', skipBreak: 'Пропустить', paused: 'Пауза', focusGuard: 'Страж', proPosture: 'Осанка', fullBodyAi: 'ИИ Тела', focusTime: 'Фокус', taskCompleted: 'Готово', markAsDone: 'Отметить как готовое?', sessionDoneAuto: 'Автосохранение', sessionDoneManual: 'Сохранить?', earlyStop: 'Остановлено', tooClose: 'Слишком близко' },
+  sound: { title: 'Фоновый звук', smartVolume: 'Умная громкость', smartVolumeDesc: 'Снижает громкость при отвлечении.', timerOnly: 'Только таймер', alwaysOn: 'Всегда вкл.', frequency: 'Частоты', ambience: 'Атмосфера', custom: 'Свой', upload: 'Загрузить', off: 'Выкл' }
 };
 
 // 10. ARABIC
 const ar = {
+  ...en,
   common: { confirm: 'تأكيد', cancel: 'إلغاء', back: 'رجوع', save: 'حفظ', delete: 'حذف', loading: 'جار التحميل...' },
   nav: { timer: 'المؤقت', tasks: 'المهام', stats: 'الإحصاء', settings: 'الإعدادات' },
   timer: { ready: 'جاهز للتركيز', estCycle: 'دورة متوقعة', focusTime: 'وقت التركيز', break: 'استراحة', start: 'بدء', pause: 'إيقاف', resume: 'استئناف', stopwatchActive: 'ساعة الإيقاف نشطة', noTasks: 'لا مهام نشطة', addOne: 'أضف مهمة جديدة', selectTask: 'اختر مهمة', startLabel: 'بدء', duration: 'المدة', pomos: 'فترات', mode_pomodoro: 'بومودورو', mode_stopwatch: 'ساعة إيقاف', mode_custom: 'مخصص' },
@@ -509,14 +525,16 @@ const ar = {
     dailyQuote: "اقتباس",
     streakDetail: "يوم {n} تتابع, EXP +{e}"
   },
-  settings: { title: 'الإعدادات', proTitle: 'FocusFlow Pro', proDesc: 'مزامنة ودعم التطوير.', viewOffer: 'عرض العرض', proMember: 'عضو Pro', thanks: 'شكراً لك!', cloudSync: 'مزامنة سحابية', enableCloud: 'تفعيل المزامنة', signOut: 'خروج', timerConfig: 'إعدادات المؤقت', focusDuration: 'تركيز', shortBreak: 'راحة قصيرة', longBreak: 'راحة طويلة', intervals: 'فترات', language: 'اللغة', support: 'دعم', restore: 'استعادة', privacy: 'خصوصية', reset: 'إعادة تعيين', choosePlan: 'اختر خطة', recurring: 'دفع متكرر.', subscribe: 'اشتراك', notifications: 'تنبيهات', addNotification: 'إضافة وقت', notifyAt: 'تنبيه عند', performance: 'أداء', powerSaver: 'موفر الطاقة', powerSaverDesc: 'يوفر البطارية.' },
+  settings: { title: 'الإعدادات', proTitle: 'FocusFlow Pro', proDesc: 'مزامنة ودعم التطوير.', viewOffer: 'عرض العرض', proMember: 'عضو Pro', thanks: 'شكراً لك!', cloudSync: 'مزامنة سحابية', enableCloud: 'تفعيل المزامنة', signOut: 'خروج', timerConfig: 'إعدادات المؤقت', focusDuration: 'تركيز', shortBreak: 'راحة قصيرة', longBreak: 'راحة طويلة', intervals: 'فترات', language: 'اللغة', support: 'دعم', restore: 'استعادة', privacy: 'خصوصية', reset: 'إعادة تعيين', choosePlan: 'اختر خطة', recurring: 'دفع متكرر.', subscribe: 'اشتراك', notifications: 'تنبيهات', addNotification: 'إضافة وقت', notifyAt: 'تنبيه عند', performance: 'أداء', powerSaver: 'موفر الطاقة', powerSaverDesc: 'يوفر البطارية.', appearance: 'المظهر', theme: 'السمة', theme_system: 'النظام', theme_light: 'فاتح', theme_dark: 'داكن' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'مزامنة أجهزة', feat_history: 'إحصائيات غير محدودة', feat_skins: 'أشكال الثعلب', feat_noise: 'ضوضاء بيضاء', feat_support: 'دعم المطور ❤️', monthly_name: 'شهري', monthly_desc: 'دفع شهري.', yearly_name: 'سنوي', yearly_desc: 'أفضل سعر.', yearly_tag: 'وفر 45%', lifetime_name: 'مدى الحياة', lifetime_desc: 'دفعة واحدة.', lifetime_tag: 'قيمة' },
-  session: { complete: 'تم!', focusedFor: 'ركزت لمدة', minutes: 'د', avgFocus: 'معدل', posture: 'وضعية', timeline: 'خط زمني', cycleLog: 'سجل', backHome: 'رئيسية', recharge: 'شحن', rest: 'راحة', breathe: 'تنفس', skipBreak: 'تخطى', paused: 'موقوف', focusGuard: 'حارس', proPosture: 'وضعية', fullBodyAi: 'ذكاء اصطناعي', focusTime: 'تركيز', taskCompleted: 'تمت', markAsDone: 'تحديد كمكتملة؟', sessionDoneAuto: 'حفظ تلقائي', sessionDoneManual: 'حفظ؟', earlyStop: 'توقف' }
+  session: { complete: 'تم!', focusedFor: 'ركزت لمدة', minutes: 'د', avgFocus: 'معدل', posture: 'وضعية', timeline: 'خط زمني', cycleLog: 'سجل', backHome: 'رئيسية', recharge: 'شحن', rest: 'راحة', breathe: 'تنفس', skipBreak: 'تخطى', paused: 'موقوف', focusGuard: 'حارس', proPosture: 'وضعية', fullBodyAi: 'ذكاء اصطناعي', focusTime: 'تركيز', taskCompleted: 'تمت', markAsDone: 'تحديد كمكتملة؟', sessionDoneAuto: 'حفظ تلقائي', sessionDoneManual: 'حفظ؟', earlyStop: 'توقف', tooClose: 'قريب جدا' },
+  sound: { title: 'الصوت الخلفي', smartVolume: 'حجم ذكي متكيف', smartVolumeDesc: 'يخفض الصوت عند التشتت.', timerOnly: 'المؤقت فقط', alwaysOn: 'دائماً', frequency: 'تردد', ambience: 'محيط', custom: 'مخصص', upload: 'رفع', off: 'إيقاف' }
 };
 
 // 11. HINDI
 const hi = {
+  ...en,
   common: { confirm: 'पुष्टि करें', cancel: 'रद्द करें', back: 'वापस', save: 'सहेजें', delete: 'हटाएं', loading: 'लोड हो रहा है...' },
   nav: { timer: 'टाइमर', tasks: 'कार्य', stats: 'आंकड़े', settings: 'सेटिंग्स' },
   timer: { ready: 'फोकस के लिए तैयार', estCycle: 'अनुमानित चक्र', focusTime: 'फोकस समय', break: 'ब्रेक', start: 'शुरू', pause: 'विराम', resume: 'जारी रखें', stopwatchActive: 'स्टॉपवॉच सक्रिय', noTasks: 'कोई कार्य नहीं', addOne: 'कार्य टैब में जोड़ें', selectTask: 'कार्य चुनें', startLabel: 'शुरू', duration: 'अवधि', pomos: 'पोमोडोरो', mode_pomodoro: 'पोमोडोरो', mode_stopwatch: 'स्टॉपवॉच', mode_custom: 'कस्टम' },
@@ -560,10 +578,11 @@ const hi = {
     dailyQuote: "दैनिक उद्धरण",
     streakDetail: "दिन {n}, EXP +{e}"
   },
-  settings: { title: 'सेटिंग्स', proTitle: 'FocusFlow Pro', proDesc: 'सिंक और समर्थन।', viewOffer: 'ऑफर देखें', proMember: 'Pro सदस्य', thanks: 'धन्यवाद!', cloudSync: 'क्लाउड सिंक', enableCloud: 'सिंक सक्षम करें', signOut: 'साइन आउट', timerConfig: 'टाइमर कॉन्फ़िगरेशन', focusDuration: 'फोकस', shortBreak: 'लघु ब्रेक', longBreak: ' लंबा ब्रेक', intervals: 'अंतराल', language: 'भाषा', support: 'समर्थन', restore: 'पुनर्स्थापना', privacy: 'गोपनीयता', reset: 'रीसेट', choosePlan: 'योजना चुनें', recurring: 'आवर्ती बिलिंग।', subscribe: 'सदस्यता लें', notifications: 'सूचनाएं', addNotification: 'समय जोड़ें', notifyAt: 'सूचित करें', performance: 'प्रदर्शन', powerSaver: 'पावर सेवर', powerSaverDesc: 'बैटरी बचाता है।' },
+  settings: { title: 'सेटिंग्स', proTitle: 'FocusFlow Pro', proDesc: 'सिंक और समर्थन।', viewOffer: 'ऑफर देखें', proMember: 'Pro सदस्य', thanks: 'धन्यवाद!', cloudSync: 'क्लाउड सिंक', enableCloud: 'सिंक सक्षम करें', signOut: 'साइन आउट', timerConfig: 'टाइमर कॉन्फ़िगरेशन', focusDuration: 'फोकस', shortBreak: 'लघु ब्रेक', longBreak: ' लंबा ब्रेक', intervals: 'अंतराल', language: 'भाषा', support: 'समर्थन', restore: 'पुनर्स्थापना', privacy: 'गोपनीयता', reset: 'रीसेट', choosePlan: 'योजना चुनें', recurring: 'आवर्ती बिलिंग।', subscribe: 'सदस्यता लें', notifications: 'सूचनाएं', addNotification: 'समय जोड़ें', notifyAt: ' सूचित करें', performance: 'प्रदर्शन', powerSaver: 'पावर सेवर', powerSaverDesc: 'बैटरी बचाता है।', appearance: 'उपस्थिति', theme: 'विषय', theme_system: 'प्रणाली', theme_light: 'रोशनी', theme_dark: 'अंधेरा' },
   footer: { version: 'FocusFlow v1.5.0', architecture: 'Local-First' },
   premium: { feat_sync: 'सिंक डिवाइस', feat_history: 'असीमित आंकड़े', feat_skins: 'फॉक्स स्किन्स', feat_noise: 'व्हाइट नॉइस', feat_support: 'समर्थन देव ❤️', monthly_name: 'मासिक', monthly_desc: 'मासिक बिल।', yearly_name: 'वार्षिक', yearly_desc: 'सर्वोत्तम मूल्य।', yearly_tag: '45% बचाएं', lifetime_name: 'जीवनभर', lifetime_desc: 'एक बार भुगतान।', lifetime_tag: 'मूल्य' },
-  session: { complete: 'पूर्ण!', focusedFor: 'फोकस समय', minutes: 'मिनट', avgFocus: 'औसत', posture: 'आसन', timeline: 'समयरेखा', cycleLog: 'लॉग', backHome: 'घर', recharge: 'रिचार्ज', rest: 'आराम', breathe: 'सांस लें', skipBreak: 'छोड़ें', paused: 'रोका गया', focusGuard: 'गार्ड', proPosture: 'आसन', fullBodyAi: 'पूर्ण AI', focusTime: 'फोकस', taskCompleted: 'पूर्ण', markAsDone: 'पूर्ण चिह्नित करें?', sessionDoneAuto: 'स्वतः सहेजा गया', sessionDoneManual: 'सहेजें?', earlyStop: 'रुका हुआ' }
+  session: { complete: 'पूर्ण!', focusedFor: 'फोकस समय', minutes: 'मिनट', avgFocus: 'औसत', posture: 'आसन', timeline: 'समयरेखा', cycleLog: 'लॉग', backHome: 'घर', recharge: 'रिचार्ज', rest: 'आराम', breathe: 'सांस लें', skipBreak: 'छोड़ें', paused: 'रोका गया', focusGuard: 'गार्ड', proPosture: 'आसन', fullBodyAi: 'पूर्ण AI', focusTime: 'फोकस', taskCompleted: 'पूर्ण', markAsDone: 'पूर्ण चिह्नित करें?', sessionDoneAuto: 'स्वतः सहेजा गया', sessionDoneManual: 'सहेजें?', earlyStop: 'रुका हुआ', tooClose: 'बहुत करीब' },
+  sound: { title: 'पृष्ठभूमि ऑडियो', smartVolume: 'स्मार्ट अनुकूली आयतन', smartVolumeDesc: 'विचलित होने पर वॉल्यूम कम करता है।', timerOnly: 'केवल टाइमर', alwaysOn: 'हमेशा चालू', frequency: 'आवृत्ति', ambience: 'माहौल', custom: 'कस्टम', upload: 'अपलोड', off: 'बंद' }
 };
 
 export const translations: Record<LanguageCode, TranslationKeys> = {

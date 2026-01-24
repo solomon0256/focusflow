@@ -1,4 +1,3 @@
-
 // services/audio.ts
 
 export type SoundCategory = 'frequency' | 'ambience' | 'custom' | 'none';
@@ -11,25 +10,29 @@ export interface SoundOption {
     isGenerated?: boolean; 
 }
 
-// 初始库，后续将由用户发送的文件填充
 export const SOUND_LIBRARY: SoundOption[] = [
     { id: 'none', name: 'Off', category: 'none', url: '' },
-    { id: 'white', name: 'White Noise', category: 'frequency', url: '', isGenerated: true },
+    { id: 'pink', name: 'Pink Noise', category: 'frequency', url: '', isGenerated: true },
+    { id: 'brown', name: 'Deep Brown', category: 'frequency', url: '', isGenerated: true },
+    { id: 'rain_proc', name: 'Procedural Rain', category: 'ambience', url: '', isGenerated: true },
+    { id: 'gamma_40', name: '40Hz Gamma', category: 'frequency', url: '', isGenerated: true },
+    // 外部托管示例 (建议用户将文件上传后替换此处 URL)
+    { id: 'cafe_remote', name: 'Paris Cafe', category: 'ambience', url: 'https://assets.mixkit.co/active_storage/sfx/243/243-preview.mp3' },
 ];
 
 class AudioServiceClass {
     private audio: HTMLAudioElement | null = null;
     private audioCtx: AudioContext | null = null;
-    private whiteNoiseNode: AudioBufferSourceNode | null = null;
+    private sourceNode: AudioBufferSourceNode | null = null;
     private gainNode: GainNode | null = null;
+    private filterNode: BiquadFilterNode | null = null;
 
     private currentId: string = 'none';
     private fadeInterval: any = null;
     
-    // Volume Management
     private baseVolume: number = 0.5; 
     private dynamicScale: number = 1.0; 
-    private isAutoVolumeEnabled: boolean = true; // 预留开关
+    private isAutoVolumeEnabled: boolean = true;
     private isGlobalMuted: boolean = false;
     
     private customSounds: Map<string, string> = new Map();
@@ -55,19 +58,26 @@ class AudioServiceClass {
         }
     }
 
+    private initWebAudio() {
+        if (!this.audioCtx) {
+            const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+            if (AudioContextClass) {
+                this.audioCtx = new AudioContextClass();
+                this.gainNode = this.audioCtx.createGain();
+                this.filterNode = this.audioCtx.createBiquadFilter();
+                this.gainNode.connect(this.audioCtx.destination);
+            }
+        }
+    }
+
     setVolume(vol: number) {
         if (!this.audio) this.init();
         this.baseVolume = Math.max(0, Math.min(1, vol));
         this.rampVolumeToTarget();
     }
 
-    // --- 核心：自动音量调节逻辑 ---
     setDynamicVolumeScale(scale: number) {
-        if (!this.isAutoVolumeEnabled) {
-            this.dynamicScale = 1.0;
-        } else {
-            this.dynamicScale = scale;
-        }
+        this.dynamicScale = this.isAutoVolumeEnabled ? scale : 1.0;
         this.rampVolumeToTarget();
     }
 
@@ -78,8 +88,7 @@ class AudioServiceClass {
     }
 
     private getTargetVolume() {
-        if (this.isGlobalMuted) return 0;
-        return this.baseVolume * this.dynamicScale;
+        return this.isGlobalMuted ? 0 : (this.baseVolume * this.dynamicScale);
     }
 
     private applyVolume(vol: number) {
@@ -88,7 +97,6 @@ class AudioServiceClass {
         if (this.audio) this.audio.volume = vol;
         if (this.gainNode && this.audioCtx) {
             try {
-                this.gainNode.gain.cancelScheduledValues(this.audioCtx.currentTime);
                 this.gainNode.gain.setTargetAtTime(vol * 0.15, this.audioCtx.currentTime, 0.1);
             } catch (e) {}
         }
@@ -117,38 +125,74 @@ class AudioServiceClass {
         }, 30);
     }
 
-    private initWebAudio() {
-        if (!this.audioCtx) {
-            // @ts-ignore
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (AudioContextClass) {
-                this.audioCtx = new AudioContextClass();
-                this.gainNode = this.audioCtx.createGain();
-                this.gainNode.connect(this.audioCtx.destination);
-            }
-        }
-    }
-
-    private startWhiteNoise() {
+    // --- 程序化音频生成器 ---
+    private startProcedural(id: string) {
         this.initWebAudio();
         if (!this.audioCtx || !this.gainNode) return;
-        if (this.whiteNoiseNode) { try { this.whiteNoiseNode.stop(); } catch(e){} }
+        this.stopSource();
 
-        const bufferSize = this.audioCtx.sampleRate * 2; 
+        const bufferSize = this.audioCtx.sampleRate * 2;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
-        let lastOut = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            const white = Math.random() * 2 - 1;
-            data[i] = (lastOut + (0.02 * white)) / 1.02;
-            lastOut = data[i];
-            data[i] *= 3.5;
+
+        if (id === 'pink') {
+            let b0, b1, b2, b3, b4, b5, b6;
+            b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.96900 * b2 + white * 0.1538520;
+                b3 = 0.86650 * b3 + white * 0.3104856;
+                b4 = 0.55000 * b4 + white * 0.5329522;
+                b5 = -0.7616 * b5 - white * 0.0168980;
+                data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+                data[i] *= 0.11;
+                b6 = white * 0.115926;
+            }
+        } else if (id === 'brown' || id === 'rain_proc') {
+            let lastOut = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
+                data[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = data[i];
+                data[i] *= 3.5;
+            }
+        } else if (id === 'gamma_40') {
+            const osc = this.audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(40, this.audioCtx.currentTime);
+            osc.connect(this.gainNode);
+            osc.start();
+            (this as any).activeOsc = osc;
+            return;
         }
-        this.whiteNoiseNode = this.audioCtx.createBufferSource();
-        this.whiteNoiseNode.buffer = buffer;
-        this.whiteNoiseNode.loop = true;
-        this.whiteNoiseNode.connect(this.gainNode);
-        this.whiteNoiseNode.start();
+
+        this.sourceNode = this.audioCtx.createBufferSource();
+        this.sourceNode.buffer = buffer;
+        this.sourceNode.loop = true;
+
+        if (id === 'rain_proc' && this.filterNode) {
+            this.filterNode.type = 'lowpass';
+            this.filterNode.frequency.value = 1000;
+            this.sourceNode.connect(this.filterNode);
+            this.filterNode.connect(this.gainNode);
+        } else {
+            this.sourceNode.connect(this.gainNode);
+        }
+        
+        this.sourceNode.start();
+    }
+
+    private stopSource() {
+        if (this.sourceNode) {
+            try { this.sourceNode.stop(); } catch(e){}
+            this.sourceNode = null;
+        }
+        if ((this as any).activeOsc) {
+            try { (this as any).activeOsc.stop(); } catch(e){}
+            (this as any).activeOsc = null;
+        }
     }
 
     registerCustomSound(id: string, url: string) {
@@ -165,23 +209,20 @@ class AudioServiceClass {
         this.stop();
         this.currentId = id;
         
-        if (id === 'white') {
-            this.startWhiteNoise();
+        const sound = SOUND_LIBRARY.find(s => s.id === id);
+        if (sound?.isGenerated) {
+            this.startProcedural(id);
             this.rampVolumeToTarget();
             return;
         }
 
-        let url = '';
-        const sound = SOUND_LIBRARY.find(s => s.id === id);
-        if (sound) url = sound.url;
-        else if (this.customSounds.has(id)) url = this.customSounds.get(id)!;
-
+        let url = sound ? sound.url : this.customSounds.get(id);
         if (url && this.audio) {
             this.audio.src = url;
             this.audio.currentTime = 0;
             this.audio.volume = 0;
             try {
-                await this.audio.play().catch(e => console.warn(`Sound file missing: ${url}`));
+                await this.audio.play().catch(e => console.warn(`Sound load failed: ${url}`));
                 this.rampVolumeToTarget();
             } catch (e) {}
         }
@@ -189,7 +230,7 @@ class AudioServiceClass {
 
     stop() {
         this.currentId = 'none';
-        if (this.whiteNoiseNode) { try { this.whiteNoiseNode.stop(); } catch(e){} this.whiteNoiseNode = null; }
+        this.stopSource();
         if (this.audio) { this.audio.pause(); this.audio.currentTime = 0; }
     }
 
@@ -200,8 +241,10 @@ class AudioServiceClass {
 
     resume() {
         if (this.currentId !== 'none' && !this.isGlobalMuted) {
-            this.initWebAudio();
-            if (this.audio && this.currentId !== 'white') this.audio.play().catch(e => {});
+            if (this.audioCtx) this.audioCtx.resume();
+            if (this.audio && !SOUND_LIBRARY.find(s => s.id === this.currentId)?.isGenerated) {
+                this.audio.play().catch(e => {});
+            }
             this.rampVolumeToTarget();
         }
     }

@@ -46,7 +46,7 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusRecord[]>([]);
   
-  // Default settings with AUDIO
+  // Default settings with AUDIO and THEME
   const [settings, setSettings] = useState<Settings>({
       workTime: 25, 
       shortBreakTime: 5, 
@@ -57,6 +57,7 @@ function App() {
       stopwatchNotifications: [],
       language: 'en', // Strict default
       batterySaverMode: false,
+      theme: 'system', // Default theme
       // Audio Defaults
       soundEnabled: false,
       soundMode: 'timer',
@@ -91,7 +92,7 @@ function App() {
                 if (!supportedCodes.includes(savedSettings.language)) {
                     savedSettings.language = 'en';
                 }
-                // Merge in case new settings (like audio) are missing from saved data
+                // Merge in case new settings (like audio/theme) are missing from saved data
                 setSettings(prev => ({ ...prev, ...savedSettings }));
             }
 
@@ -114,6 +115,25 @@ function App() {
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
   useEffect(() => { if(isAppReady && user) NativeService.Storage.set(STORAGE_KEYS.USER, user); }, [user, isAppReady]);
 
+  // --- THEME LOGIC ---
+  useEffect(() => {
+    const root = window.document.documentElement;
+    const applyTheme = () => {
+        const isDark = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) root.classList.add('dark');
+        else root.classList.remove('dark');
+    };
+    
+    applyTheme();
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = () => {
+        if (settings.theme === 'system') applyTheme();
+    };
+    mediaQuery.addEventListener('change', listener);
+    return () => mediaQuery.removeEventListener('change', listener);
+  }, [settings.theme]);
+
   // --- AUDIO LOGIC ORCHESTRATOR ---
   useEffect(() => {
       if (!isAppReady) return;
@@ -123,10 +143,7 @@ function App() {
       // 1. ALWAYS ON Mode
       if (settings.soundEnabled && settings.soundMode === 'always') {
           // Play immediately if id is valid
-          // If browser blocks autoplay, this might fail until first interaction, but we try.
           AudioService.play(settings.selectedSoundId);
-          // If user switches visibility (background), AudioService handles mute inside itself (via visibilitychange).
-          // But here we ensure that if we return from background, we check this logic again.
           if (!document.hidden) AudioService.resume(); 
       }
       
@@ -271,10 +288,10 @@ function App() {
       setCurrentSessionParams(null);
   };
 
-  if (!isAppReady) return <div className="h-screen w-full bg-[#f2f2f7] flex items-center justify-center"><Zap size={32} className="text-blue-500 animate-bounce"/></div>;
+  if (!isAppReady) return <div className="h-screen w-full bg-[#f2f2f7] dark:bg-[#121212] flex items-center justify-center"><Zap size={32} className="text-blue-500 animate-bounce"/></div>;
 
   return (
-    <div className="h-screen w-full bg-[#f2f2f7] text-gray-900 overflow-hidden font-sans">
+    <div className="h-screen w-full bg-[#f2f2f7] dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors duration-300">
       <main className="h-full w-full">
         {isFocusSessionActive && currentSessionParams ? (
             <FocusSessionView 

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle, Battery } from 'lucide-react';
+import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle, Battery, Monitor } from 'lucide-react';
 import { TimerMode, Task, User, Settings } from '../types';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
 import { NativeService } from '../services/native';
@@ -102,6 +102,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const [debugInfo, setDebugInfo] = useState<string>('AI: Idle'); 
   const [showCameraPreview, setShowCameraPreview] = useState(true);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [isTooClose, setIsTooClose] = useState(false); // NEW STATE
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null); 
@@ -121,9 +122,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   // --- AUDIO CONTROL: Dynamic Volume based on Focus ---
   useEffect(() => {
-      // If sound is enabled, adjust volume based on focus state.
-      // Distracted = Lower volume (loss of immersion)
-      // Focused = Normal volume
       if (settings.soundEnabled) {
           if (focusState === 'DISTRACTED' || focusState === 'ABSENT') {
               AudioService.setDynamicVolumeScale(0.2);
@@ -350,9 +348,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           const remainingMs = sessionEndTimeRef.current - now;
           const remainingSec = Math.ceil(remainingMs / 1000);
 
-          // Update Stats Accumulators (Approximate 1s tick)
-          // Note: Since we use Delta Time for the main timer, stats might slightly drift but it's acceptable for charts.
-          // For strict accuracy, we'd calculate diff since last tick.
           if (phase === 'WORK' && remainingSec > 0) {
               totalFocusedSecondsRef.current++;
               currentCycleElapsedRef.current++;
@@ -468,7 +463,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       }
   };
 
-  // DEBUG: Fast Forward needs to adjust End Time ref now
   const handleDebugFastForward = () => {
       if (phase === 'WORK') {
           const SKIP_MINUTES = 30;
@@ -516,6 +510,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           const nose = landmarks[0];
           const leftEar = landmarks[7];
           const rightEar = landmarks[8];
+          const leftShoulder = landmarks[11];
+          const rightShoulder = landmarks[12];
+
           const headWidth = Math.abs(leftEar.x - rightEar.x);
           const earMidX = (leftEar.x + rightEar.x) / 2;
           const rawYawRatio = (nose.x - earMidX) / headWidth;
@@ -523,6 +520,16 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           smoothYawRef.current = (smoothYawRef.current * 0.7) + (rawYawRatio * 0.3);
           const currentYaw = smoothYawRef.current * 90;
           
+          // --- DISTANCE DETECTION LOGIC ---
+          const currentShoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+          const baseShoulderWidth = calibrationRef.current.shoulderWidthBase || 0.4; // Default to 0.4 if calibration missing
+          // If shoulders appear 40% larger than calibration, you are too close.
+          if (currentShoulderWidth > baseShoulderWidth * 1.4) {
+             setIsTooClose(true);
+          } else {
+             setIsTooClose(false);
+          }
+
           if (Math.abs(currentYaw) > 40) {
               newState = 'DISTRACTED';
               setFocusScore(prev => Math.max(0, prev - 0.2));
@@ -536,7 +543,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           
           setFocusState(newState);
 
-          // ... (Visualization drawing code remains the same)
+          // ... (Visualization drawing code)
           ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
           ctx.fillRect(10, 10, 240, 150);
           ctx.fillStyle = "#00FF00";
@@ -695,7 +702,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95 }} 
                     animate={{ opacity: 1, scale: 1 }} 
-                    className="absolute inset-0 bg-[#f2f2f7] z-50 flex flex-col pt-safe-top pb-safe overflow-y-auto no-scrollbar"
+                    className="absolute inset-0 bg-[#f2f2f7] dark:bg-black z-50 flex flex-col pt-safe-top pb-safe overflow-y-auto no-scrollbar"
                 >
                     {/* Confetti */}
                     <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -718,8 +725,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                         >
                             <Sparkles size={48} className="text-green-600" />
                         </motion.div>
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.complete}</h1>
-                        <p className="text-gray-500">{t.focusedFor} <span className="text-green-600 font-bold">{
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{t.complete}</h1>
+                        <p className="text-gray-500 dark:text-gray-400">{t.focusedFor} <span className="text-green-600 font-bold">{
                             (() => {
                                 const m = totalFocusedSecondsRef.current / 60;
                                 return formatMinutes(m);
@@ -734,7 +741,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                             <motion.div 
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="bg-white p-5 rounded-2xl shadow-sm border border-blue-100"
+                                className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-blue-100 dark:border-blue-900/50"
                             >
                                 <div className="flex items-start gap-4">
                                     <div 
@@ -743,14 +750,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                             NativeService.Haptics.impactLight();
                                         }}
                                         className={`w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors
-                                            ${isTaskCompleted ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white'}
+                                            ${isTaskCompleted ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-transparent'}
                                         `}
                                     >
                                         {isTaskCompleted && <CheckCircle2 size={18} className="text-white" />}
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="font-bold text-gray-900 line-clamp-1">{task.title}</h3>
-                                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                        <h3 className="font-bold text-gray-900 dark:text-white line-clamp-1">{task.title}</h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                             {isTaskCompleted 
                                                 ? t.taskCompleted 
                                                 : (didFinishNaturally ? t.markAsDone : t.earlyStop)
@@ -763,28 +770,28 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
                         {/* 1. Main Stats Grid */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white p-5 rounded-2xl shadow-sm">
+                            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm">
                                 <div className="flex items-center gap-2 mb-2 text-gray-400">
                                     <Brain size={16} /> <span className="text-xs font-bold uppercase">{t.avgFocus}</span>
                                 </div>
-                                <div className="text-3xl font-bold text-gray-900">
+                                <div className="text-3xl font-bold text-gray-900 dark:text-white">
                                     {Math.round(sessionHistoryRef.current.reduce((a, b) => a + b.avgFocusScore, 0) / (sessionHistoryRef.current.length || 1))}%
                                 </div>
                             </div>
-                            <div className="bg-white p-5 rounded-2xl shadow-sm">
+                            <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm">
                                 <div className="flex items-center gap-2 mb-2 text-gray-400">
                                     <Move size={16} /> <span className="text-xs font-bold uppercase">{t.posture}</span>
                                 </div>
-                                <div className="text-3xl font-bold text-gray-900">Good</div>
+                                <div className="text-3xl font-bold text-gray-900 dark:text-white">Good</div>
                                 <div className="text-xs text-green-500 font-medium mt-1">Stable</div>
                             </div>
                         </div>
 
                         {/* 2. Timeline Chart (UPDATED LAYOUT) */}
-                        <div className="bg-white p-5 rounded-2xl shadow-sm">
+                        <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="font-bold text-gray-800">{t.timeline}</h3>
-                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">5 min intervals</span>
+                                <h3 className="font-bold text-gray-800 dark:text-gray-200">{t.timeline}</h3>
+                                <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-2 py-1 rounded">5 min intervals</span>
                             </div>
                             
                             {fullTimeline.length === 0 ? (
@@ -833,14 +840,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                     </div>
                                 </div>
                             )}
-                            <div className="border-t border-gray-100 mt-0 w-full" />
+                            <div className="border-t border-gray-100 dark:border-gray-700 mt-0 w-full" />
                         </div>
                     </div>
 
-                    <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#f2f2f7] via-[#f2f2f7] to-transparent z-20">
+                    <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#f2f2f7] dark:from-black via-[#f2f2f7] dark:via-black to-transparent z-20">
                         <button 
                             onClick={handleFinish}
-                            className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
+                            className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
                         >
                             {t.backHome}
                         </button>
@@ -945,8 +952,20 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                 </motion.div>
                             )}
 
+                            {/* TOO CLOSE ALERT */}
+                            {!notificationMsg && isTooClose && (
+                                <motion.div 
+                                    key="too_close"
+                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+                                    className="bg-orange-500/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-orange-900/50"
+                                >
+                                    <Monitor size={14} className="text-white" />
+                                    <span className="font-bold text-xs tracking-wide">{t.tooClose}</span>
+                                </motion.div>
+                            )}
+
                             {/* AI Focus States */}
-                            {!notificationMsg && (!isAiDisabled) && focusState === 'DISTRACTED' && (
+                            {!notificationMsg && !isTooClose && (!isAiDisabled) && focusState === 'DISTRACTED' && (
                                 <motion.div 
                                     key="distracted"
                                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
@@ -956,7 +975,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                     <span className="font-bold text-xs tracking-wide">STAY FOCUSED</span>
                                 </motion.div>
                             )}
-                            {!notificationMsg && (!isAiDisabled) && focusState === 'DEEP_FLOW' && (
+                            {!notificationMsg && !isTooClose && (!isAiDisabled) && focusState === 'DEEP_FLOW' && (
                                 <motion.div 
                                     key="flow"
                                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}

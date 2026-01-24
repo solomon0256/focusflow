@@ -52,7 +52,7 @@ const minutesToSliderValue = (min: number) => {
 const QuickSlider = ({ label, value, onChange, max, colorClass, unit = 'm' }: { label: string, value: number, onChange: (v: number) => void, max: number, colorClass: string, unit?: string }) => (
     <div>
         <div className="flex justify-between items-center mb-1.5">
-            <span className="text-sm font-medium text-gray-700">{label}</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
             <span className={`text-sm font-bold font-mono ${colorClass}`}>
                 {/* Use smart formatting if unit is 'm' (minutes), otherwise default behavior */}
                 {unit === 'm' ? formatMinutes(value) : `${value}${unit}`}
@@ -64,7 +64,7 @@ const QuickSlider = ({ label, value, onChange, max, colorClass, unit = 'm' }: { 
             max={max}
             value={value}
             onChange={(e) => onChange(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-blue-500"
+            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-500"
         />
     </div>
 );
@@ -190,7 +190,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
 
   const theme = useMemo(() => {
       return {
-          gradient: 'from-rose-300/40 via-red-200/40 to-orange-100/40',
+          gradient: 'from-rose-300/40 via-red-200/40 to-orange-100/40 dark:from-rose-900/20 dark:via-red-800/20 dark:to-orange-900/20',
       };
   }, []);
 
@@ -335,13 +335,13 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
       const activeNotifications = getCurrentNotifications();
       
       return (
-        <div className="bg-gray-50/50 p-3 rounded-xl border border-gray-100 mt-4">
+        <div className="bg-gray-50/50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-700 mt-4">
             <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-1.5">
-                    <Bell size={12} className="text-gray-500" />
-                    <span className="text-xs font-bold text-gray-500 uppercase">{tSettings.notifications}</span>
+                    <Bell size={12} className="text-gray-500 dark:text-gray-400" />
+                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">{tSettings.notifications}</span>
                 </div>
-                <span className="text-[10px] font-bold text-gray-400">{activeNotifications.length}/10</span>
+                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">{activeNotifications.length}/10</span>
             </div>
             
             <div className="flex flex-wrap gap-2">
@@ -349,7 +349,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                     <button 
                         key={n}
                         onClick={() => handleRemoveNotification(n)}
-                        className="flex items-center gap-1 bg-white border border-gray-200 px-2 py-1 rounded-md text-xs font-semibold text-gray-600 shadow-sm active:scale-95 transition-transform"
+                        className="flex items-center gap-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 py-1 rounded-md text-xs font-semibold text-gray-600 dark:text-gray-200 shadow-sm active:scale-95 transition-transform"
                     >
                         {formatMinutes(n)}
                         <X size={10} className="text-gray-400" />
@@ -365,7 +365,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                 setIsNotificationPickerOpen(true);
                             }
                         }}
-                        className="flex items-center gap-1 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md text-xs font-bold text-blue-500 active:scale-95 transition-transform"
+                        className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-900/50 px-2 py-1 rounded-md text-xs font-bold text-blue-500 dark:text-blue-400 active:scale-95 transition-transform"
                     >
                         <Plus size={10} strokeWidth={3} />
                         {tSettings.addNotification}
@@ -377,7 +377,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
   };
 
   return (
-    <div className="h-full pt-safe-top pb-24 px-6 bg-[#f2f2f7] relative overflow-y-auto no-scrollbar w-full">
+    <div className="h-full pt-safe-top pb-24 px-6 bg-[#f2f2f7] dark:bg-black relative overflow-y-auto no-scrollbar w-full transition-colors duration-300">
       
       {/* Dynamic Gradient Marker */}
       <motion.div 
@@ -408,10 +408,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                 {/* NEW: Sound Button (Larger & More Prominent) */}
                 <button 
                     onClick={() => setIsSoundSelectorOpen(true)}
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 duration-200 border-2
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg dark:shadow-none transition-all active:scale-95 duration-200 border-2
                         ${settings.soundEnabled 
                             ? 'bg-indigo-500 border-indigo-500 text-white shadow-indigo-200' 
-                            : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:text-gray-600'
+                            : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-400 hover:border-gray-200 hover:text-gray-600'
                         }
                     `}
                 >
@@ -421,10 +421,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                 {/* Quick Action Button (Larger & More Prominent) - ONLY for Pomodoro now */}
                 <button 
                     onClick={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 duration-200 border-2
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg dark:shadow-none transition-all active:scale-95 duration-200 border-2
                         ${isQuickSettingsOpen 
-                            ? 'bg-gray-800 border-gray-800 text-white' 
-                            : (mode === TimerMode.POMODORO ? 'bg-white border-gray-100 text-blue-500 hover:border-blue-100' : 'hidden')
+                            ? 'bg-gray-800 text-white border-gray-800' 
+                            : (mode === TimerMode.POMODORO ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-blue-500 hover:border-blue-100' : 'hidden')
                         }
                     `}
                 >
@@ -436,13 +436,13 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             <motion.div 
                 animate={{ boxShadow: ["0 0 0px rgba(59, 130, 246, 0)", "0 0 10px rgba(59, 130, 246, 0.3)", "0 0 0px rgba(59, 130, 246, 0)"] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 text-gray-500 flex items-center gap-2`}
+                className={`px-5 py-2 rounded-full text-xs font-bold tracking-wider uppercase mb-6 transition-all duration-300 shadow-sm z-10 bg-white/90 dark:bg-gray-800/90 text-gray-500 dark:text-gray-400 flex items-center gap-2`}
             >
                 <Brain size={12} className="text-blue-500"/>
                 <span>{t.ready}</span>
             </motion.div>
             
-            <div className="text-[18vw] font-thin font-mono tracking-tighter tabular-nums text-gray-900 leading-none drop-shadow-sm z-10 select-none">
+            <div className="text-[18vw] font-thin font-mono tracking-tighter tabular-nums text-gray-900 dark:text-white leading-none drop-shadow-sm z-10 select-none">
                 {formatTime(displayTime)}
             </div>
         </div>
@@ -460,17 +460,17 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                     >
                         {/* Timeline Area */}
                         <div className="w-full">
-                            <div className="flex justify-between text-xs text-gray-500 mb-2 px-1 font-bold uppercase tracking-widest">
+                            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2 px-1 font-bold uppercase tracking-widest">
                                 <span>{t.estCycle}</span>
                                 <span>{formatMinutes(Math.floor(calculateTotalDuration(settings.workTime, settings.shortBreakTime, settings.longBreakTime, currentRounds) / 60))}</span>
                             </div>
                             
-                            <div className="h-12 w-full bg-white/90 backdrop-blur-md rounded-2xl p-2 shadow-sm flex gap-1.5 relative overflow-hidden border-2 border-blue-200 transition-all">
+                            <div className="h-12 w-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl p-2 shadow-sm flex gap-1.5 relative overflow-hidden border-2 border-blue-200 dark:border-blue-900/50 transition-all">
                                 {timelineSegments.map((seg, idx) => {
-                                    let activeBg = 'bg-gray-100';
-                                    if (seg.type === 'work') activeBg = 'bg-rose-100';
-                                    else if (seg.type === 'shortBreak') activeBg = 'bg-amber-100';
-                                    else if (seg.type === 'longBreak') activeBg = 'bg-emerald-100';
+                                    let activeBg = 'bg-gray-100 dark:bg-gray-700';
+                                    if (seg.type === 'work') activeBg = 'bg-rose-100 dark:bg-rose-900/40';
+                                    else if (seg.type === 'shortBreak') activeBg = 'bg-amber-100 dark:bg-amber-900/40';
+                                    else if (seg.type === 'longBreak') activeBg = 'bg-emerald-100 dark:bg-emerald-900/40';
 
                                     return (
                                     <div 
@@ -501,10 +501,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                     exit={{ height: 0, opacity: 0, marginTop: 0 }}
                                     className="overflow-hidden"
                                 >
-                                     <div className="bg-white/80 backdrop-blur-xl p-5 rounded-3xl shadow-sm border border-white/50 w-full">
-                                         <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                                     <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-5 rounded-3xl shadow-sm border border-white/50 dark:border-white/10 w-full">
+                                         <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
                                             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{tSettings.timerConfig}</span>
-                                            <button onClick={handleReset} className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md active:scale-95 transition-transform">
+                                            <button onClick={handleReset} className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md active:scale-95 transition-transform">
                                                 <RotateCcw size={10} /> {tSettings.reset.toUpperCase()}
                                             </button>
                                          </div>
@@ -512,7 +512,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                              <QuickSlider label={tSettings.focusDuration} value={settings.workTime} onChange={handleWorkTimeChange} max={90} colorClass="text-rose-500" />
                                              <QuickSlider label={tSettings.shortBreak} value={settings.shortBreakTime} onChange={v => setSettings({...settings, shortBreakTime: v})} max={30} colorClass="text-amber-500" />
                                              <QuickSlider label={tSettings.longBreak} value={settings.longBreakTime} onChange={v => setSettings({...settings, longBreakTime: v})} max={45} colorClass="text-emerald-500" />
-                                             <div className="border-t border-gray-100 my-2" />
+                                             <div className="border-t border-gray-100 dark:border-gray-700 my-2" />
                                              <QuickSlider label={tSettings.intervals} value={settings.pomodorosPerRound} onChange={v => setSettings({...settings, pomodorosPerRound: v})} max={10} colorClass="text-indigo-500" unit="" />
                                              {/* Pomodoro also uses the notification panel in the dropdown */}
                                              <NotificationPanel />
@@ -532,10 +532,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         exit={{ opacity: 0 }}
                         className="w-full"
                     >
-                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                             <div className="flex justify-between items-center mb-4">
-                                <span className="text-sm font-bold text-gray-500 uppercase">{t.duration}</span>
-                                <span className="text-xl font-mono font-bold text-blue-600">
+                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase">{t.duration}</span>
+                                <span className="text-xl font-mono font-bold text-blue-600 dark:text-blue-400">
                                     {formatMinutes(customDuration)}
                                 </span>
                             </div>
@@ -558,7 +558,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                          }));
                                      }
                                 }}
-                                className="w-full h-4 bg-gray-100 rounded-full appearance-none cursor-pointer accent-blue-500"
+                                className="w-full h-4 bg-gray-100 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-500"
                             />
                             {/* Independent Custom Notification Panel */}
                             <NotificationPanel />
@@ -574,10 +574,10 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         exit={{ opacity: 0 }}
                         className="w-full"
                      >
-                        <div className="bg-white p-4 rounded-2xl border border-gray-100 flex flex-col gap-2">
-                            <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex flex-col gap-2">
+                            <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-600">
                                 <Clock size={16} className="text-gray-400" />
-                                <span className="text-sm text-gray-500">{t.stopwatchActive}</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{t.stopwatchActive}</span>
                             </div>
                             {/* Independent Stopwatch Notification Panel */}
                             <NotificationPanel />
@@ -591,7 +591,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
         <div className="flex-none flex flex-col justify-center relative z-20">
             <div className="flex items-center justify-between mb-2 px-2">
                 <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t.selectTask}</span>
-                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-center">
+                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded text-center">
                     {sortedTasks.length > 0 ? `${browsingTaskIndex + 1} / ${sortedTasks.length}` : '0 / 0'}
                 </span>
             </div>
@@ -605,7 +605,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -50 }}
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={`bg-white rounded-3xl shadow-md border-2 relative overflow-hidden transition-all duration-300
+                            className={`bg-white dark:bg-gray-800 rounded-3xl shadow-md border-2 relative overflow-hidden transition-all duration-300
                             ${selectedTaskId === currentTask?.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-transparent'}
                             `}
                         >
@@ -617,7 +617,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                    <>
                                        <div className="flex justify-between items-start mb-3">
                                            <div className="pr-2">
-                                                <h3 className="text-lg font-bold text-gray-900 line-clamp-1">{currentTask.title}</h3>
+                                                <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">{currentTask.title}</h3>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${getPriorityColor(currentTask.priority)}`}>
                                                         {currentTask.priority}
@@ -630,7 +630,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                            <button 
                                                 onClick={handleSelectTask}
                                                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95
-                                                    ${selectedTaskId === currentTask.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-300'}
+                                                    ${selectedTaskId === currentTask.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 dark:bg-gray-700 text-gray-300'}
                                                 `}
                                             >
                                                 {selectedTaskId === currentTask.id ? <CheckCircle2 size={20} /> : <Circle size={20} />}
@@ -638,24 +638,24 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                                        </div>
 
                                        {/* Metadata Grid */}
-                                       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                                       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                                            <div className="flex flex-col items-start">
                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{t.startLabel}</span>
-                                               <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
+                                               <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
                                                    <Clock size={14} className="text-blue-500"/>
                                                    {currentTask.time || '--:--'}
                                                </div>
                                            </div>
                                            <div className="flex flex-col items-start">
                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
-                                               <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
+                                               <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
                                                     <Calendar size={14} className="text-purple-500"/>
                                                    {formatMinutes(currentTask.durationMinutes)}
                                                </div>
                                            </div>
                                            <div className="flex flex-col items-start">
                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
-                                               <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
+                                               <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
                                                     <Zap size={14} className="text-yellow-500"/>
                                                     {currentTask.pomodoroCount}
                                                </div>
@@ -667,12 +667,12 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                         </motion.div>
                     </AnimatePresence>
                      <div className="absolute top-1/2 -translate-y-1/2 w-full flex justify-between pointer-events-none px-0 z-20">
-                        <button onClick={handlePrevTask} disabled={browsingTaskIndex === 0} className="pointer-events-auto w-10 h-10 -ml-4 bg-white shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 hover:text-blue-500"><ChevronLeft size={24} /></button>
-                        <button onClick={handleNextTask} disabled={browsingTaskIndex >= sortedTasks.length - 1} className="pointer-events-auto w-10 h-10 -mr-4 bg-white shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 hover:text-blue-500"><ChevronRight size={24} /></button>
+                        <button onClick={handlePrevTask} disabled={browsingTaskIndex === 0} className="pointer-events-auto w-10 h-10 -ml-4 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 dark:text-gray-300 hover:text-blue-500"><ChevronLeft size={24} /></button>
+                        <button onClick={handleNextTask} disabled={browsingTaskIndex >= sortedTasks.length - 1} className="pointer-events-auto w-10 h-10 -mr-4 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 dark:text-gray-300 hover:text-blue-500"><ChevronRight size={24} /></button>
                     </div>
                 </div>
             ) : (
-                <div className="bg-white/50 border-2 border-dashed border-gray-300 rounded-3xl p-6 flex flex-col items-center justify-center text-gray-400 min-h-[140px]">
+                <div className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-3xl p-6 flex flex-col items-center justify-center text-gray-400 min-h-[140px]">
                     <p>{t.noTasks}</p>
                     <p className="text-xs mt-1">{t.addOne}</p>
                 </div>
@@ -684,7 +684,7 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={handleStart}
-                className={`w-24 h-24 rounded-full flex items-center justify-center shadow-xl shadow-blue-200 transition-colors bg-blue-600 text-white`}
+                className={`w-24 h-24 rounded-full flex items-center justify-center shadow-xl shadow-blue-200 dark:shadow-none transition-colors bg-blue-600 text-white`}
             >
                 <Play size={32} fill="currentColor" className="ml-1" />
             </motion.button>
@@ -705,12 +705,12 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
                     initial={{ scale: 0.9, y: 10 }}
                     animate={{ scale: 1, y: 0 }}
                     exit={{ scale: 0.9, y: 10 }}
-                    className="bg-white w-full max-w-[300px] rounded-2xl p-6 shadow-2xl relative"
+                    className="bg-white dark:bg-gray-800 w-full max-w-[300px] rounded-2xl p-6 shadow-2xl relative"
                     onClick={e => e.stopPropagation()}
                 >
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-gray-900">{tSettings.notifyAt}</h3>
-                        <button onClick={() => setIsNotificationPickerOpen(false)} className="bg-gray-100 p-1 rounded-full text-gray-500">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{tSettings.notifyAt}</h3>
+                        <button onClick={() => setIsNotificationPickerOpen(false)} className="bg-gray-100 dark:bg-gray-700 p-1 rounded-full text-gray-500">
                             <X size={16} />
                         </button>
                     </div>
