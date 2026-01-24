@@ -61,7 +61,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
 
   // --- New Date/Time Picker State ---
   // We keep the raw values as the source of truth
-  const [formDate, setFormDate] = useState(""); // YYYY-MM-DD
+  const [formDate, setFormDate] = useState<string>(""); // YYYY-MM-DD
   const [formTime, setFormTime] = useState(""); // HH:mm (24h)
   
   // UI Toggles
@@ -73,7 +73,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   
   // FIX: Pre-calculate grid to avoid type inference issues
   // Using explicit type annotation instead of generic to avoid TSX parsing issues
-  const calendarGrid: (Date | null)[] = useMemo(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
+  const calendarGrid = useMemo<Array<Date | null>>(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
 
   // Time Wheel State (12h format)
   const [wHour12, setWHour12] = useState("12");
@@ -442,7 +442,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                         {/* FIXED: Use Local Date string logic for display */}
                                         {(() => {
                                             if (!formDate) return "";
-                                            const [y, m, d] = formDate.split('-').map(Number);
+                                            const [y, m, d] = (formDate as string).split('-').map(Number);
                                             const dateObj = new Date(y, m - 1, d);
                                             return dateObj.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                                         })()}

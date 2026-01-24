@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, X, Radio, Upload, Plus } from 'lucide-react';
+import { Volume2, VolumeX, X, Radio, Upload, Plus, AudioWaveform, CloudRain, Trees, Coffee } from 'lucide-react';
 import { Settings } from '../types';
 import { SOUND_LIBRARY, AudioService, SoundOption } from '../services/audio';
 import { IOSSegmentedControl } from './IOSComponents';
@@ -45,6 +45,29 @@ export const SoundSelector: React.FC<SoundSelectorProps> = ({ isOpen, onClose, s
         }
     };
 
+    // Helper to render the correct icon based on ID
+    const getIcon = (sound: SoundOption) => {
+        const size = 28;
+        const strokeWidth = 1.5;
+        
+        switch (sound.id) {
+            case 'none':
+                return <VolumeX size={size} strokeWidth={strokeWidth} />;
+            case 'white':
+                // The requested "Sine Wave" symbol
+                return <AudioWaveform size={size} strokeWidth={strokeWidth} />;
+            case 'rain':
+                return <CloudRain size={size} strokeWidth={strokeWidth} />;
+            case 'forest':
+                return <Trees size={size} strokeWidth={strokeWidth} />;
+            case 'cafe':
+                return <Coffee size={size} strokeWidth={strokeWidth} />;
+            default:
+                // Fallback for custom uploads
+                return <span className="text-xl font-bold">♪</span>;
+        }
+    };
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -71,7 +94,7 @@ export const SoundSelector: React.FC<SoundSelectorProps> = ({ isOpen, onClose, s
 
                         {/* Mode Switcher */}
                         <div className="mb-6">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Playback Mode</label>
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">PLAYBACK MODE</label>
                             <IOSSegmentedControl 
                                 options={['Timer Only', 'Always On']} 
                                 selected={settings.soundMode === 'timer' ? 'Timer Only' : 'Always On'}
@@ -92,23 +115,25 @@ export const SoundSelector: React.FC<SoundSelectorProps> = ({ isOpen, onClose, s
                                     <button
                                         key={sound.id}
                                         onClick={() => handleSoundSelect(sound.id)}
-                                        className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-95
+                                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all active:scale-95
                                             ${isSelected 
-                                                ? 'border-indigo-500 bg-indigo-50 shadow-md shadow-indigo-100' 
-                                                : 'border-transparent bg-gray-50 text-gray-600'
+                                                ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' 
+                                                : 'border-transparent bg-gray-50 hover:bg-gray-100 text-gray-400'
                                             }
                                         `}
                                     >
-                                        <div className="text-2xl mb-1">{sound.icon}</div>
+                                        <div className={`mb-2 ${isSelected ? 'text-indigo-600' : 'text-current'}`}>
+                                            {getIcon(sound)}
+                                        </div>
                                         <span className={`text-xs font-bold ${isSelected ? 'text-indigo-700' : 'text-gray-500'}`}>{sound.name}</span>
-                                        {isSelected && <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full mt-1.5 animate-pulse" />}
+                                        {isSelected && <div className="w-1 h-1 bg-indigo-500 rounded-full mt-1" />}
                                     </button>
                                 )
                             })}
                             
                             {/* Upload Button */}
-                            <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 text-gray-400 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-500 transition-colors active:scale-95">
-                                <Upload size={20} className="mb-1" />
+                            <label className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 text-gray-400 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-500 transition-colors active:scale-95">
+                                <Upload size={24} strokeWidth={1.5} className="mb-2" />
                                 <span className="text-xs font-bold">Custom</span>
                                 <input type="file" accept="audio/*" className="hidden" onChange={handleFileUpload} />
                             </label>
