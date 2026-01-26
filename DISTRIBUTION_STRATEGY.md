@@ -1,115 +1,47 @@
+# FocusFlow 全球分发与支付策略 (Global Distribution & Payment Strategy) V2
 
-# FocusFlow 全球分发与上架策略 (Global Distribution Strategy)
+## 1. 支付方案核心架构 (The "Revenue Stack")
 
-本文档旨在规划 FocusFlow 在全球三个核心区域（中国大陆、欧洲、其他地区）的上架、合规及变现策略。
+为了平衡“开发难度”、“手续费成本”和“合规性”，我们建议采用 **RevenueCat + IAP + Stripe** 的混合架构。
 
----
-
-## 1. 市场区域划分 (Market Segmentation)
-
-我们将全球市场划分为三个优先级区域，根据合规要求和分发渠道的不同制定策略。
-
-| 区域 (Region) | 关键特征 | 核心平台 | 优先级 |
+| 渠道 | 支付工具 | 抽成 | 评价 |
 | :--- | :--- | :--- | :--- |
-| **Zone A: 中国大陆 (CN)** | 市场巨大，但监管最严。无 Google 服务，支付渠道特殊。 | App Store (CN), 本地安卓商店 | High |
-| **Zone B: 欧洲 (EU)** | 用户付费能力强，隐私法规 (GDPR) 极其严格。 | App Store, Google Play | High |
-| **Zone C: 全球其他 (Global)** | 包括北美、日韩、东南亚。遵循标准国际规则。 | App Store, Google Play | Medium |
+| **iOS (App Store)** | Apple IAP | 15% - 30% | **强制性**。不走这个会被下架。通过 RevenueCat 接入可极大简化逻辑。 |
+| **Android (Google Play)** | Google Billing | 15% | **强制性**。适用于国际版。 |
+| **Android (中国区/官网版)** | Stripe / 支付宝 / 微信 | 1% - 3% | **高自由度**。不受谷歌限制，建议通过 Stripe 接入网页版支付。 |
+| **Web 官网** | **Stripe** | ~3% | **利润最高**。建议引导核心老用户在此续费。 |
 
 ---
 
-## 2. iOS 分发策略 (Apple App Store)
+## 2. RevenueCat：支付救星 (Recommended Workflow)
 
-iOS 是最容易管理的平台，因为它是统一的，但针对中国区有特殊门槛。
-
-### 2.1 全球通用 (Zone B & C)
-*   **账号**: Apple Developer Program ($99/年)。
-*   **包体**: 同一个二进制文件 (IPA) 分发给所有地区。
-*   **本地化**: 在 App Store Connect 中配置多语言元数据 (英语、得语、法语、日语等)。
-*   **隐私**: 必须配置 App Tracking Transparency (ATT) 弹窗（如果使用了广告 ID）。
-
-### 2.2 中国大陆特别对策 (Zone A - iOS)
-*   **ICP 备案 (App备案)**: **[关键痛点]**
-    *   自 2023/2024 年起，新 App 上架中国区 App Store **必须** 填写 ICP 备案号。
-    *   **要求**: 需要在中国大陆有服务器/云主机，并走工信部备案流程。如果是个人开发者，虽然可以备案，但流程相对繁琐。
-*   **数据存放**: 建议中国用户的数据留存在中国境内服务器（或使用云服务商的中国节点），以符合《数据安全法》。
+不要直接调用 Apple/Google 的底层 SDK，使用 **RevenueCat** 封装：
+1.  **统一模型**: 定义一次 `pro_membership`，它自动对应 Apple 的 IAP ID 和 Stripe 的价格 ID。
+2.  **免后端验证**: 它自动处理收据验证，你不需要自己写服务器。
+3.  **防作弊**: 自动处理黑产退款、跨设备多开等异常。
 
 ---
 
-## 3. Android 分发策略 (Google Play vs. China)
+## 3. 苹果/谷歌合规死线 (Compliance Hard-lines)
 
-这是最复杂的环节。
+### ❌ 绝对禁止 (会导致下架)
+*   在 iOS/Android App 内显示：“由于苹果抽成，请去官网购买更便宜”。
+*   在 App 内部放置任何指向 Stripe 支付页面的外链。
+*   在 App 内部提供使用信用卡直接支付数字功能的功能。
 
-### 3.1 国际版 (Zone B & C) - Google Play
-*   **渠道**: Google Play Store ($25 一次性费用)。
-*   **技术栈**: 使用 Android App Bundle (.aab)。
-*   **支付**: Google Play Billing。
-*   **合规 (欧洲 EU)**:
-    *   **GDPR**: 必须在 App 内提供清晰的“删除账户”功能。
-    *   **Consent**: 必须弹出 Cookie/数据追踪同意框 (CMP)。
-
-### 3.2 中国大陆版 (Zone A) - The "No Google" Problem
-
-由于 Google Play 不可用，我们面临碎片化市场。
-
-#### 方案一：硬核模式 (主流应用商店)
-*   **渠道**: 华为、小米、OPPO、VIVO、腾讯应用宝。
-*   **门槛**: **极高**。
-    *   **软件著作权 (软著)**: 几乎所有国内主流商店都强制要求上传“计算机软件著作权证书”。申请周期 1-3 个月，加急需要几千元人民币。
-    *   **企业主体**: 部分商店不支持个人开发者上传带有“内购”或“账号体系”的 App。
-*   **建议**: **初期不推荐**。成本太高，审核太慢。
-
-#### 方案二：独立/极客模式 (推荐 MVP 阶段使用)
-*   **渠道 1: 酷安 (CoolApk)**
-    *   国内最大的数码极客社区。对个人开发者相对友好，虽然现在审核也变严了，但比大厂商店容易沟通。
-    *   用户群体与 FocusFlow (生产力工具) 高度重合。
-*   **渠道 2: 官网直接下载 (APK Side-loading)**
-    *   搭建一个精美的落地页 (Landing Page)。
-    *   提供直接的 `.apk` 下载链接。
-    *   **缺点**: 安装时手机会提示“未知来源风险”，转化率会降低。微信内无法直接下载（需引导浏览器打开）。
+### ✅ 允许操作
+*   **静默同步**: 用户在 Web 端支付后，App 内登录即解锁（App 内保持沉默）。
+*   **外部链接政策 (仅限部分地区)**: 在欧盟等特定地区，现在允许有限度地告知用户有外部支付选项，但操作流程极其繁琐且仍需缴纳“引导费”。
 
 ---
 
-## 4. 商业化与支付 (Monetization & Payments)
+## 4. 实施建议 (Implementation Plan)
 
-### 4.1 国际支付 (IAP)
-*   **iOS**: 必须使用 Apple In-App Purchase (IAP)。
-*   **Google Play**: 必须使用 Google Play Billing。
-*   **费率**: 均为 15% - 30% 抽成。
-*   **技术实现**: 使用 `RevenueCat` SDK。它可以一套代码同时通过 Apple 和 Google 的支付验证，极大地减少开发工作量。
-
-### 4.2 中国大陆支付
-*   **iOS**: 依然走 Apple IAP (支持支付宝/微信绑定)，这是最稳妥的。
-*   **Android**:
-    *   **痛点**: 个人开发者**很难**申请支付宝/微信的 App 支付接口（需要企业资质）。
-    *   **变通方案**: 
-        1.  **SaaS 订阅制**: 引导用户去官网登录账号，在网页端支付（使用 Stripe/LemonSqueezy 等支持支付宝的聚合支付，或者国内的第四方签约支付），App 端仅做状态同步。**注意**: 这种做法在 iOS 是违规的，但在 Android 官网包是允许的。
-        2.  **完全免费+广告**: 接穿山甲(头条)或优量汇(腾讯)的广告。
+1.  **初期 (MVP)**: 仅接入 **Apple IAP** (通过 RevenueCat)。虽然抽成 30%，但它能让你最快拿到第一笔收入，且无需担心合规。
+2.  **中期 (Scale)**: 建立 **FocusFlow Web Dashboard**，接入 **Stripe**。在发送给用户的营销邮件、社交媒体广告中推广官网购买链接。
+3.  **长期 (Optimization)**: 利用 RevenueCat 的实验功能，对官网 Stripe 用户和 App Store 用户展示不同的促销活动。
 
 ---
 
-## 5. 执行路线图 (Action Plan)
-
-### 第一阶段：MVP 验证 (Focus on iOS & Global Android)
-1.  **iOS**: 上架全球（含中国区）。如果不搞定 ICP 备案，暂时放弃中国区 App Store，或者仅使用 TestFlight 进行小范围测试。
-2.  **Android Global**: 上架 Google Play。
-3.  **Android China**: 仅提供 **官网 APK 下载**。在 Bilibili/小红书/酷安 宣传，引导用户去官网装。
-
-### 第二阶段：合规化 (Compliance)
-1.  **申请软著**: 淘宝找代理，申请 FocusFlow 的软著。
-2.  **ICP 备案**: 购买阿里云/腾讯云轻量服务器，完成 App 备案。
-3.  **上架国内商店**: 拿着软著和备案号，首发 **酷安** 和 **小米应用商店** (相对开放)。
-
-### 第三阶段：本地化运营
-1.  **服务器分流**: 
-    *   全球用户 -> Firebase / AWS。
-    *   中国用户 -> 阿里云/腾讯云 (提升连接速度，符合合规)。
-
----
-
-## 6. 总结建议
-
-对于 FocusFlow 这样一款依赖 AI 视觉的生产力工具：
-
-1.  **主攻 iOS**。iOS 设备性能统一（利于 AI 运算），用户付费意愿高，且 App Store 是唯一入口，解决掉 ICP 备案后分发非常省心。
-2.  **Android 走“出海”路线**。优先做 Google Play 市场。
-3.  **国内 Android 佛系一点**。不要试图一开始就上架所有安卓商店，维护成本极高。做一个漂亮的官网，放一个下载链接，足以覆盖核心种子用户。
+## 5. 总结
+**Stripe 是省钱的工具，但 IAP 是在苹果/谷歌领地生存的门票。** 我们通过 RevenueCat 把这两者桥接起来，实现“代码写一次，钱从四方来”。

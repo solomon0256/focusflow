@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
 import TasksView from './views/TasksView';
@@ -8,7 +7,7 @@ import SettingsView from './views/SettingsView';
 import FocusSessionView from './views/FocusSessionView';
 import { Task, Settings, Priority, FocusRecord, TimerMode, User, LanguageCode } from './types';
 import { NativeService } from './services/native';
-import { AudioService } from './services/audio'; // Import Audio Service
+import { AudioService } from './services/audio';
 import { Zap } from 'lucide-react';
 
 const STORAGE_KEYS = {
@@ -18,8 +17,6 @@ const STORAGE_KEYS = {
     USER: 'focusflow_user'
 };
 
-// --- HELPER: Get Local YYYY-MM-DD ---
-// Fixes the UTC timezone bug where tasks appeared on wrong days
 export const getLocalDateString = (date: Date = new Date()) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -30,11 +27,7 @@ export const getLocalDateString = (date: Date = new Date()) => {
 function App() {
   const [activeTab, setActiveTab] = useState('timer');
   const [isFocusSessionActive, setIsFocusSessionActive] = useState(false);
-  
-  // Track Session Phase for Audio Logic
-  // 'IDLE' | 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK'
   const [sessionPhase, setSessionPhase] = useState<'IDLE' | 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK'>('IDLE');
-
   const [isAppReady, setIsAppReady] = useState(false);
   const [currentSessionParams, setCurrentSessionParams] = useState<{
       mode: TimerMode;
@@ -46,278 +39,105 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [focusHistory, setFocusHistory] = useState<FocusRecord[]>([]);
   
-  // Default settings with AUDIO and THEME
   const [settings, setSettings] = useState<Settings>({
-      workTime: 25, 
-      shortBreakTime: 5, 
-      longBreakTime: 15, 
-      pomodorosPerRound: 4,
-      notifications: [],
-      customNotifications: [],
-      stopwatchNotifications: [],
-      language: 'en', // Strict default
-      batterySaverMode: false,
-      theme: 'system', // Default theme
-      // Audio Defaults
-      soundEnabled: false,
-      soundMode: 'timer',
-      selectedSoundId: 'none',
-      soundVolume: 0.5
+      workTime: 25, shortBreakTime: 5, longBreakTime: 15, pomodorosPerRound: 4,
+      notifications: [], customNotifications: [], stopwatchNotifications: [],
+      language: 'en', batterySaverMode: false, theme: 'system',
+      soundEnabled: false, soundMode: 'timer', selectedSoundId: 'none', soundVolume: 0.5
   });
 
+  // 全量初始化加载
   useEffect(() => {
     const initApp = async () => {
         try {
-            const savedUser = await NativeService.Storage.get<User>(STORAGE_KEYS.USER);
-            if (savedUser) {
-                if (!savedUser.pet) {
-                    savedUser.pet = { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' };
-                } else if (savedUser.pet.streakCount === undefined) {
-                    savedUser.pet.streakCount = 0;
-                }
-                setUser(savedUser);
-            } else {
-                setUser({
-                    id: 'guest_' + Date.now(),
-                    name: 'Guest',
-                    email: '',
-                    isPremium: false,
-                    pet: { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' }
-                });
-            }
-            
-            const savedSettings = await NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS);
-            if (savedSettings) {
-                const supportedCodes: LanguageCode[] = ['en', 'zh', 'zh-TW', 'fr', 'ja', 'ko', 'es', 'ru', 'ar', 'de', 'hi'];
-                if (!supportedCodes.includes(savedSettings.language)) {
-                    savedSettings.language = 'en';
-                }
-                // Merge in case new settings (like audio/theme) are missing from saved data
-                setSettings(prev => ({ ...prev, ...savedSettings }));
-            }
-
-            const savedTasks = await NativeService.Storage.get<Task[]>(STORAGE_KEYS.TASKS);
-            if (savedTasks) setTasks(savedTasks);
-            else {
-                 const today = getLocalDateString();
-                 setTasks([{ id: '1', title: 'Welcome to FocusFlow', date: today, time: '09:00', durationMinutes: 25, priority: Priority.HIGH, completed: false, pomodoroCount: 1, note: 'This is a local-first app.' }]);
-            }
-            const savedHistory = await NativeService.Storage.get<FocusRecord[]>(STORAGE_KEYS.HISTORY);
-            if (savedHistory) setFocusHistory(savedHistory || []);
-        } catch (e) { console.error('Initialization error:', e); } 
-        finally { setTimeout(() => setIsAppReady(true), 500); }
+            const [u, s, t, h] = await Promise.all([
+                NativeService.Storage.get<User>(STORAGE_KEYS.USER),
+                NativeService.Storage.get<Settings>(STORAGE_KEYS.SETTINGS),
+                NativeService.Storage.get<Task[]>(STORAGE_KEYS.TASKS),
+                NativeService.Storage.get<FocusRecord[]>(STORAGE_KEYS.HISTORY)
+            ]);
+            if (u) setUser(u);
+            else setUser({ id: 'guest_' + Date.now(), name: 'Guest', email: '', isPremium: false, pet: { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' } });
+            if (s) setSettings(prev => ({ ...prev, ...s }));
+            if (t) setTasks(t);
+            else setTasks([{ id: '1', title: 'Welcome to FocusFlow', date: getLocalDateString(), time: '09:00', durationMinutes: 25, priority: Priority.HIGH, completed: false, pomodoroCount: 1, note: 'This is a local-first app.' }]);
+            if (h) setFocusHistory(h);
+        } catch (e) { console.error('Init error:', e); } 
+        finally { setIsAppReady(true); }
     };
     initApp();
   }, []);
 
+  // 持久化同步 - 使用防抖或简单的就绪检查
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.TASKS, tasks); }, [tasks, isAppReady]);
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.HISTORY, focusHistory); }, [focusHistory, isAppReady]);
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
   useEffect(() => { if(isAppReady && user) NativeService.Storage.set(STORAGE_KEYS.USER, user); }, [user, isAppReady]);
 
-  // --- THEME LOGIC ---
+  // 主题应用逻辑
   useEffect(() => {
     const root = window.document.documentElement;
     const applyTheme = () => {
         const isDark = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (isDark) root.classList.add('dark');
-        else root.classList.remove('dark');
+        if (isDark) root.classList.add('dark'); else root.classList.remove('dark');
     };
-    
     applyTheme();
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const listener = () => {
-        if (settings.theme === 'system') applyTheme();
-    };
-    mediaQuery.addEventListener('change', listener);
-    return () => mediaQuery.removeEventListener('change', listener);
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', applyTheme);
+    return () => mq.removeEventListener('change', applyTheme);
   }, [settings.theme]);
 
-  // --- AUDIO LOGIC ORCHESTRATOR ---
+  // 音频编排
   useEffect(() => {
       if (!isAppReady) return;
-
       AudioService.setVolume(settings.soundVolume);
-
-      // 1. ALWAYS ON Mode
-      if (settings.soundEnabled && settings.soundMode === 'always') {
-          // Play immediately if id is valid
-          AudioService.play(settings.selectedSoundId);
-          if (!document.hidden) AudioService.resume(); 
-      }
-      
-      // 2. TIMER ONLY Mode
-      else if (settings.soundEnabled && settings.soundMode === 'timer') {
-          if (isFocusSessionActive && sessionPhase === 'WORK') {
-              AudioService.play(settings.selectedSoundId);
-          } else {
-              // Pause if break or idle
-              AudioService.pause();
-          }
-      }
-      
-      // 3. DISABLED
-      else {
-          AudioService.stop();
-      }
-
+      if (settings.soundEnabled) {
+          if (settings.soundMode === 'always') { AudioService.play(settings.selectedSoundId); AudioService.resume(); }
+          else if (isFocusSessionActive && sessionPhase === 'WORK') AudioService.play(settings.selectedSoundId);
+          else AudioService.pause();
+      } else AudioService.stop();
   }, [settings.soundEnabled, settings.soundMode, settings.selectedSoundId, settings.soundVolume, isFocusSessionActive, sessionPhase, isAppReady]);
 
+  // 辅助函数：通过用户点击激活 AudioContext
+  const onUserInteraction = useCallback(() => {
+    AudioService.play('none'); // 静默触发激活
+    window.removeEventListener('click', onUserInteraction);
+  }, []);
 
-  const addFocusRecord = (minutes: number, mode: TimerMode, date?: string, score?: number) => {
-      const newRecord: FocusRecord = {
-          id: Date.now().toString() + Math.random(),
-          date: date || getLocalDateString(),
-          durationMinutes: minutes,
-          mode: mode,
-          score: score || 100
-      };
-      setFocusHistory(prev => [...prev, newRecord]);
-      return newRecord;
-  };
-
-  const getTier = (days: number): number => {
-      if (days >= 6) return 4;
-      if (days >= 4) return 3;
-      if (days >= 2) return 2;
-      return 1;
-  };
-
-  const calculateMaxExp = (level: number) => {
-      return 300 + Math.floor(Math.pow(level, 1.6) * 25);
-  };
-
-  const processStreakAndExp = (currentUser: User, minutes: number, dateStr: string, isTaskComplete: boolean = false, score: number = 100) => {
-      const pet = currentUser.pet;
-      const lastActivityStr = pet.lastDailyActivityDate;
-      
-      let newStreak = pet.streakCount;
-      let streakExp = 0;
-
-      if (lastActivityStr !== dateStr) {
-          if (lastActivityStr) {
-              const lastDate = new Date(lastActivityStr);
-              const currentDate = new Date(dateStr);
-              const diffDays = Math.floor((currentDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-              
-              if (diffDays === 1) newStreak += 1;
-              else if (diffDays > 1) {
-                  const oldTier = getTier(pet.streakCount);
-                  newStreak = oldTier === 4 ? 2 : 1;
-              } else {
-                  newStreak = Math.max(1, newStreak);
-              }
-          } else {
-              newStreak = 1;
-          }
-          const tier = getTier(newStreak);
-          streakExp = tier === 4 ? 15 : tier === 3 ? 12 : tier === 2 ? 10 : 5;
-      }
-
-      let multiplier = 1.0;
-      if (score > 90) multiplier = 1.5;
-      else if (score > 75) multiplier = 1.3;
-      else if (score > 60) multiplier = 1.0;
-      else multiplier = 0.8;
-
-      const baseTimeExp = minutes * 0.4;
-      const baseTaskExp = isTaskComplete ? 10 : 0;
-      
-      const weightedActivityExp = Math.ceil((baseTimeExp + baseTaskExp) * multiplier); 
-      
-      let newExp = pet.currentExp + streakExp + weightedActivityExp;
-      
-      let newLevel = pet.level;
-      let newMaxExp = pet.maxExp || calculateMaxExp(newLevel);
-
-      while (newExp >= newMaxExp) {
-          newLevel += 1;
-          newExp -= newMaxExp;
-          newMaxExp = calculateMaxExp(newLevel);
-      }
-
-      return {
-          ...currentUser,
-          pet: { 
-              ...pet, 
-              level: newLevel, 
-              currentExp: newExp, 
-              maxExp: newMaxExp, 
-              streakCount: newStreak, 
-              lastDailyActivityDate: dateStr, 
-              happiness: Math.min(100, pet.happiness + (minutes > 12 ? 10 : 0)) 
-          }
-      };
-  };
-
-  const handleSimulate = (minutes: number, dateOffset: number = 0) => {
-      const d = new Date();
-      if (dateOffset !== 0) d.setDate(d.getDate() + dateOffset);
-      const dateStr = getLocalDateString(d); 
-      
-      const simScore = 100;
-
-      addFocusRecord(minutes, TimerMode.POMODORO, dateStr, simScore);
-      if (user) {
-          setUser(processStreakAndExp(user, minutes, dateStr, false, simScore));
-      }
-      NativeService.Haptics.notificationSuccess();
-  };
-
-  const handleBreakStreak = () => {
-      if (!user) return;
-      const mockDate = new Date();
-      mockDate.setDate(mockDate.getDate() - 2); 
-      const mockDateStr = getLocalDateString(mockDate); 
-      setUser({ ...user, pet: { ...user.pet, lastDailyActivityDate: mockDateStr } });
-      NativeService.Haptics.impactMedium();
-  };
+  useEffect(() => {
+    window.addEventListener('click', onUserInteraction);
+    return () => window.removeEventListener('click', onUserInteraction);
+  }, [onUserInteraction]);
 
   const handleSessionComplete = (minutes: number, taskCompleted: boolean = false, avgScore: number = 100) => {
       if (currentSessionParams) {
-          const dateStr = getLocalDateString(); 
-          addFocusRecord(minutes, currentSessionParams.mode, dateStr, avgScore);
-          if (user) setUser(prev => prev ? processStreakAndExp(prev, minutes, dateStr, taskCompleted, avgScore) : null);
+          const newRecord: FocusRecord = { id: Date.now().toString(), date: getLocalDateString(), durationMinutes: minutes, mode: currentSessionParams.mode, score: avgScore };
+          setFocusHistory(prev => [...prev, newRecord]);
           if (currentSessionParams.taskId && taskCompleted) {
               setTasks(prev => prev.map(t => t.id === currentSessionParams.taskId ? { ...t, completed: true } : t));
           }
       }
-      setIsFocusSessionActive(false);
-      setSessionPhase('IDLE'); // Reset Phase
-      setCurrentSessionParams(null);
+      setIsFocusSessionActive(false); setSessionPhase('IDLE'); setCurrentSessionParams(null);
   };
 
-  if (!isAppReady) return <div className="h-screen w-full bg-[#f2f2f7] dark:bg-[#121212] flex items-center justify-center"><Zap size={32} className="text-blue-500 animate-bounce"/></div>;
+  if (!isAppReady) return <div className="h-screen w-full bg-ios-bg dark:bg-ios-bg-dark flex items-center justify-center"><Zap size={32} className="text-blue-500 animate-bounce"/></div>;
 
   return (
-    <div className="h-screen w-full bg-[#f2f2f7] dark:bg-black text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors duration-300">
+    <div className="h-screen w-full bg-ios-bg dark:bg-ios-bg-dark text-gray-900 dark:text-gray-100 overflow-hidden font-sans">
       <main className="h-full w-full">
         {isFocusSessionActive && currentSessionParams ? (
             <FocusSessionView 
-                mode={currentSessionParams.mode} 
-                initialTimeInSeconds={currentSessionParams.durationMinutes * 60} 
-                settings={settings} 
-                user={user} 
-                task={tasks.find(t => t.id === currentSessionParams.taskId)} 
-                onComplete={handleSessionComplete} 
-                onCancel={() => { setIsFocusSessionActive(false); setSessionPhase('IDLE'); }} 
-                onUpgradeTrigger={() => { setIsFocusSessionActive(false); setSessionPhase('IDLE'); setActiveTab('settings'); }} 
-                // Pass a callback so FocusSessionView can tell App what phase it is in (Work vs Break)
-                onPhaseChange={(phase) => setSessionPhase(phase)}
+                mode={currentSessionParams.mode} initialTimeInSeconds={currentSessionParams.durationMinutes * 60} 
+                settings={settings} user={user} task={tasks.find(t => t.id === currentSessionParams.taskId)} 
+                onComplete={handleSessionComplete} onCancel={() => setIsFocusSessionActive(false)} 
+                onUpgradeTrigger={() => { setIsFocusSessionActive(false); setActiveTab('settings'); }} 
+                onPhaseChange={setSessionPhase}
             />
         ) : (
-            activeTab === 'timer' ? <TimerView tasks={tasks.filter(t => !t.completed)} settings={settings} setSettings={setSettings} onRecordTime={addFocusRecord} onStartSession={(d, m, tId) => { setCurrentSessionParams({ durationMinutes: d, mode: m, taskId: tId }); setIsFocusSessionActive(true); setSessionPhase('WORK'); }} /> :
-            activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => {
-                const updatedTask = tasks.find(t => t.id === id);
-                if (updatedTask && !updatedTask.completed && user) {
-                    const dateStr = getLocalDateString();
-                    setUser(processStreakAndExp(user, 0, dateStr, true));
-                }
-                setTasks(prev => prev.map(x => x.id === id ? { ...x, completed: !x.completed } : x))
-            }} /> :
-            activeTab === 'stats' ? <StatsView tasks={tasks} focusHistory={focusHistory} settings={settings} onSimulate={handleSimulate} onBreakStreak={handleBreakStreak} /> :
-            <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} onInjectData={(t, h, u) => { setTasks(t); setFocusHistory(h); setUser(u); }} />
+            activeTab === 'timer' ? <TimerView tasks={tasks.filter(t => !t.completed)} settings={settings} setSettings={setSettings} onRecordTime={()=>{}} onStartSession={(d, m, tId) => { setCurrentSessionParams({ durationMinutes: d, mode: m, taskId: tId }); setIsFocusSessionActive(true); setSessionPhase('WORK'); }} /> :
+            activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => setTasks(prev => prev.map(x => x.id === id ? { ...x, completed: !x.completed } : x))} /> :
+            activeTab === 'stats' ? <StatsView tasks={tasks} focusHistory={focusHistory} settings={settings} /> :
+            <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} />
         )}
       </main>
       {!isFocusSessionActive && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} settings={settings} />}
