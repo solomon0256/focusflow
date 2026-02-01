@@ -122,19 +122,14 @@ function App() {
               setTasks(prev => prev.map(t => t.id === currentSessionParams.taskId ? { ...t, completed: true } : t));
           }
 
-          // 3. Economy System (Strictly following PET_SYSTEM_DESIGN.md)
+          // 3. Economy System: Update Streak, EXP, and Level
           if (user) {
               const todayStr = getLocalDateString();
               const lastActive = user.pet.lastDailyActivityDate;
               let newStreak = user.pet.streakCount;
-              let isFirstSessionToday = false;
 
-              // STREAK LOGIC:
-              // Only increment if last activity was strictly yesterday.
-              // If last activity was today, streak remains same.
-              // If last activity was older than yesterday, reset to 1.
+              // Streak Logic
               if (lastActive !== todayStr) {
-                  isFirstSessionToday = true;
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
                   const yesterdayStr = getLocalDateString(yesterday);
@@ -146,29 +141,18 @@ function App() {
                   }
               }
 
-              // EXP LOGIC (Per PET_SYSTEM_DESIGN.md):
-              // Rule 1: "每专注 25 分钟可获得 10 EXP" -> (minutes / 25) * 10
-              let baseExp = (minutes / 25) * 10;
+              // EXP Logic
+              // Base: 1 EXP per minute
+              let earnedExp = Math.floor(minutes);
+              // Bonus: Task Completion (+10%)
+              if (taskCompleted) earnedExp += Math.floor(minutes * 0.1);
+              // Bonus: High Quality Focus (+20%)
+              if (avgScore >= 80) earnedExp += Math.floor(minutes * 0.2);
               
-              // Rule 2: "如果专注评分 > 90，该时段 EXP 收益增加 50%"
-              if (avgScore > 90) {
-                  baseExp = baseExp * 1.5;
-              }
+              // Ensure minimum 1 EXP for short sessions
+              earnedExp = Math.max(1, earnedExp);
 
-              // Rule 3: "每日登录并完成一轮专注，额外获得连胜 EXP"
-              // We award this only on the first session of the day
-              let streakBonusExp = 0;
-              if (isFirstSessionToday) {
-                  // Simple tier for streak bonus
-                  if (newStreak >= 7) streakBonusExp = 20;
-                  else if (newStreak >= 3) streakBonusExp = 10;
-                  else streakBonusExp = 5;
-              }
-
-              // Total Calculation (Floor to integer as per gaming standards)
-              const totalEarnedExp = Math.floor(baseExp + streakBonusExp);
-
-              let newCurrentExp = user.pet.currentExp + totalEarnedExp;
+              let newCurrentExp = user.pet.currentExp + earnedExp;
               let newLevel = user.pet.level;
               let newMaxExp = user.pet.maxExp;
 
@@ -189,7 +173,7 @@ function App() {
                       maxExp: newMaxExp,
                       streakCount: newStreak,
                       lastDailyActivityDate: todayStr,
-                      happiness: Math.min(100, prev.pet.happiness + 5) // Increase happiness on activity
+                      happiness: Math.min(100, prev.pet.happiness + 5) // Increase happiness
                   }
               }) : null);
           }
