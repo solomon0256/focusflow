@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import BottomNav from './components/BottomNav';
 import TimerView from './views/TimerView';
@@ -68,7 +69,7 @@ function App() {
     initApp();
   }, []);
 
-  // 持久化同步 - 使用防抖或简单的就绪检查
+  // 持久化同步
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.TASKS, tasks); }, [tasks, isAppReady]);
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.HISTORY, focusHistory); }, [focusHistory, isAppReady]);
   useEffect(() => { if(isAppReady) NativeService.Storage.set(STORAGE_KEYS.SETTINGS, settings); }, [settings, isAppReady]);
@@ -100,7 +101,7 @@ function App() {
 
   // 辅助函数：通过用户点击激活 AudioContext
   const onUserInteraction = useCallback(() => {
-    AudioService.play('none'); // 静默触发激活
+    AudioService.play('none'); 
     window.removeEventListener('click', onUserInteraction);
   }, []);
 

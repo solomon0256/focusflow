@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages, Beaker, Terminal, Loader2, Battery, Zap, Palette, Moon, HelpCircle, FileText } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton, IOSSegmentedControl } from '../components/IOSComponents';
@@ -378,7 +379,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                     ))}
                 </div>
 
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t.choosePlan}</div>
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{tPremium.choosePlan}</div>
 
                 <div className="space-y-3 mb-6">
                     {SAAS_CONFIG.plans.map((plan) => {
@@ -426,16 +427,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
                     <div className="flex items-center justify-center gap-2">
                         <Apple size={20} fill="currentColor" /> 
                         <span>
-                            {t.subscribe} {selectedPlan?.price}
+                            {tPremium.subscribe} {selectedPlan?.price}
                         </span>
                     </div>
                 </IOSButton>
 
                 <p className="text-[10px] text-gray-400 text-center leading-tight">
-                    {t.recurring}
+                    {tPremium.recurring}
                 </p>
                 <button onClick={handleRestorePurchases} className="w-full mt-3 py-1 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors">
-                    {t.restore}
+                    {tPremium.restore}
                 </button>
             </div>
         </motion.div>
