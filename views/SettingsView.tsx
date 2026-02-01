@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages, Beaker, Terminal, Loader2, Battery, Zap, Palette, Moon, HelpCircle, FileText } from 'lucide-react';
+import { ChevronRight, User as UserIcon, Shield, LogOut, CreditCard, Crown, X, Apple, Check, Cloud, RotateCcw, Languages, Beaker, Terminal, Loader2, Battery, Zap, Palette, Moon, HelpCircle, FileText, SlidersHorizontal } from 'lucide-react';
 import { IOSCard, IOSToggle, IOSButton, IOSSegmentedControl } from '../components/IOSComponents';
 import { Settings, User, Product, LanguageCode, Task, FocusRecord, TimerMode, Priority } from '../types';
 import { SAAS_CONFIG } from '../config';
@@ -106,6 +106,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
   const defaultPlanId = SAAS_CONFIG.plans.find(p => p.tag === 'BEST VALUE')?.id || SAAS_CONFIG.plans[0].id;
   const [selectedPlanId, setSelectedPlanId] = useState<string>(defaultPlanId);
   const selectedPlan = SAAS_CONFIG.plans.find(p => p.id === selectedPlanId);
+  const [buildTime] = useState(new Date().toLocaleString());
 
   const getPlanDetails = (planId: string) => {
       if (planId.includes('monthly')) return { name: tPremium.monthly_name, desc: tPremium.monthly_desc, tag: null };
@@ -564,6 +565,26 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
           />
        </IOSCard>
 
+       {/* PREFERENCES (NEW) */}
+       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">{t.preferences}</h2>
+       <IOSCard className="px-4 py-4">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white bg-indigo-500">
+                        <SlidersHorizontal size={18} />
+                    </div>
+                    <span className="font-medium text-gray-900 dark:text-white">{t.timeFormat}</span>
+                </div>
+            </div>
+            <IOSSegmentedControl 
+                options={['12h', '24h']}
+                selected={settings.timeFormat || '24h'}
+                onChange={(val) => {
+                    setSettings(prev => ({...prev, timeFormat: val as '12h' | '24h'}));
+                }}
+            />
+       </IOSCard>
+
        {/* APPEARANCE */}
        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-2 mt-6">{t.appearance}</h2>
        <IOSCard className="px-4 py-4">
@@ -642,6 +663,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, setSettings, user
        <div className="mt-8 mb-safe text-center">
            <p className="text-xs font-bold text-gray-400">{tFooter?.version || 'FocusFlow v1.5.0'}</p>
            <p className="text-[10px] text-gray-300 mt-1">{tFooter?.architecture || 'Local-First Architecture'}</p>
+           <p className="text-[10px] text-gray-500 mt-2">{buildTime}</p>
        </div>
 
        <AnimatePresence>

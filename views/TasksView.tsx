@@ -37,8 +37,26 @@ const generateCalendarGrid = (cursorDate: Date): (Date | null)[] => {
     return days;
 };
 
+// Helper: 12h Logic
+const to12h = (time24: string) => {
+    const [hStr, mStr] = time24.split(':');
+    const h = parseInt(hStr, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    // Fix: Return standard 12-hour format without leading zero (e.g. "1" instead of "01")
+    return { h12: h12.toString(), m: mStr, ampm };
+};
+
+const to24h = (h12: string, m: string, ampm: string) => {
+    let h = parseInt(h12, 10);
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${m}`;
+};
+
 const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateTask, deleteTask, toggleTask }) => {
   const t = translations[settings.language].tasks;
+  const tTimer = translations[settings.language].timer;
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,28 +74,12 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [modalCalendarCursor, setModalCalendarCursor] = useState(new Date());
   
-  // 安全的类型定义，防止编译报错
   const calendarGrid: (Date | null)[] = useMemo(() => generateCalendarGrid(modalCalendarCursor), [modalCalendarCursor]);
 
-  const [wHour12, setWHour12] = useState("12");
+  // Time Picker State
+  const [wHour, setWHour] = useState("12");
   const [wMinute, setWMinute] = useState("00");
-  const [wAmPm, setWAmPm] = useState("AM");
-
-  const to12h = (time24: string) => {
-      if (!time24) return { h: "12", m: "00", p: "AM" };
-      const [h, m] = time24.split(':').map(Number);
-      const p = h >= 12 ? "PM" : "AM";
-      let h12 = h % 12;
-      if (h12 === 0) h12 = 12;
-      return { h: h12.toString(), m: m.toString().padStart(2,'0'), p };
-  };
-
-  const to24h = (h12: string, m: string, p: string) => {
-      let h = parseInt(h12);
-      if (p === "PM" && h !== 12) h += 12;
-      if (p === "AM" && h === 12) h = 0;
-      return `${h.toString().padStart(2,'0')}:${m}`;
-  };
+  const [wAmPm, setWAmPm] = useState("AM"); // Only used for 12h
 
   useEffect(() => {
     if (isModalOpen) {
@@ -90,18 +92,42 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
             setFormPomodoros(editingTask.pomodoroCount);
             setFormNote(editingTask.note || "");
             setModalCalendarCursor(new Date(editingTask.date + "T00:00:00"));
-            const timeObj = to12h(editingTask.time || "09:00");
-            setWHour12(timeObj.h); setWMinute(timeObj.m); setWAmPm(timeObj.p);
+            
+            // Initialize picker based on settings.timeFormat
+            const timeStr = editingTask.time || "09:00";
+            if (settings.timeFormat === '12h') {
+                const { h12, m, ampm } = to12h(timeStr);
+                setWHour(h12);
+                setWMinute(m);
+                setWAmPm(ampm);
+            } else {
+                const [h, m] = timeStr.split(':');
+                setWHour(h.padStart(2, '0'));
+                setWMinute(m.padStart(2, '0'));
+            }
         } else {
             setFormTitle("");
             const todayStr = getLocalDateString();
             setSelectedDates(new Set([todayStr]));
             setModalCalendarCursor(new Date());
+            
+            // Default to next hour
             const now = new Date();
-            const timeStr = `${(now.getHours()+1).toString().padStart(2,'0')}:00`;
+            const nextHour = (now.getHours() + 1) % 24;
+            const timeStr = `${nextHour.toString().padStart(2,'0')}:00`;
+            
+            if (settings.timeFormat === '12h') {
+                // FIXED: Use to12h to get the correct initial picker values for "Next Hour"
+                const { h12, m, ampm } = to12h(timeStr);
+                setWHour(h12);
+                setWMinute("00");
+                setWAmPm(ampm);
+            } else {
+                setWHour(nextHour.toString().padStart(2, '0'));
+                setWMinute("00");
+            }
+            
             setFormTime(timeStr);
-            const timeObj = to12h(timeStr);
-            setWHour12(timeObj.h); setWMinute(timeObj.m); setWAmPm(timeObj.p);
             setFormPriority(Priority.MEDIUM);
             setFormDuration(25);
             setFormPomodoros(1);
@@ -110,11 +136,27 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
         setIsDatePickerOpen(false);
         setIsTimePickerOpen(false);
     }
-  }, [isModalOpen, editingTask]);
+  }, [isModalOpen, editingTask, settings.timeFormat]);
 
   useEffect(() => {
-      if (isModalOpen) setFormTime(to24h(wHour12, wMinute, wAmPm));
-  }, [wHour12, wMinute, wAmPm, isModalOpen]);
+      if (isModalOpen) {
+          if (settings.timeFormat === '12h') {
+              setFormTime(to24h(wHour, wMinute, wAmPm));
+          } else {
+              setFormTime(`${wHour}:${wMinute}`);
+          }
+      }
+  }, [wHour, wMinute, wAmPm, isModalOpen, settings.timeFormat]);
+
+  // Display Helper for the row
+  const getDisplayTime = (time24: string) => {
+      if (!time24) return '';
+      if (settings.timeFormat === '12h') {
+          const { h12, m, ampm } = to12h(time24);
+          return `${h12}:${m} ${ampm}`;
+      }
+      return time24;
+  };
 
   const handleDateClick = (dateStr: string) => {
       const newSet = new Set(selectedDates);
@@ -239,7 +281,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                                     <div className="flex-1 min-w-0">
                                         <h3 className={`font-semibold text-gray-900 dark:text-white truncate ${task.completed ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</h3>
                                         <div className="flex flex-wrap items-center gap-2 mt-2">
-                                            {task.time && <span className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 px-1.5 py-0.5 rounded">{task.time}</span>}
+                                            {task.time && <span className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 px-1.5 py-0.5 rounded">{getDisplayTime(task.time)}</span>}
                                             <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${getPriorityColor(task.priority)}`}>{task.priority}</span>
                                             <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded"><Zap size={10} /> {task.pomodoroCount}</span>
                                             <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded"><Clock size={10} /> {formatMinutes(task.durationMinutes)}</span>
@@ -267,6 +309,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                     </div>
                     <div className="overflow-y-auto flex-1 space-y-5 pb-4 no-scrollbar">
                         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm"><input autoFocus type="text" placeholder={t.whatToDo} className="w-full text-lg font-medium outline-none bg-transparent text-gray-900 dark:text-white" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></div>
+                        
+                        {/* Date & Time Picker */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
                             <div className="flex flex-col border-b dark:border-gray-700">
                                 <div className="flex justify-between items-center p-4 cursor-pointer" onClick={() => { setIsDatePickerOpen(!isDatePickerOpen); setIsTimePickerOpen(false); }}>
@@ -282,22 +326,77 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, settings, addTask, updateT
                             <div className="flex flex-col">
                                 <div className="flex justify-between items-center p-4 cursor-pointer" onClick={() => { setIsTimePickerOpen(!isTimePickerOpen); setIsDatePickerOpen(false); }}>
                                     <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center"><Clock size={18} /></div><span className="font-medium dark:text-white">{t.time}</span></div>
-                                    <span className="text-sm font-medium text-blue-500">{wHour12}:{wMinute} {wAmPm}</span>
+                                    <span className="text-sm font-medium text-blue-500">
+                                        {settings.timeFormat === '12h' ? `${wHour}:${wMinute} ${wAmPm}` : `${wHour}:${wMinute}`}
+                                    </span>
                                 </div>
                                 <AnimatePresence>{isTimePickerOpen && <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden bg-gray-50/50 dark:bg-gray-900/50 p-6 flex justify-center gap-1">
-                                    <IOSWheelPicker items={Array.from({length:12}, (_,i)=>(i+1).toString())} selected={wHour12} onChange={setWHour12} width="w-16" />
-                                    <div className="h-32 flex items-center font-bold text-gray-400 text-xl">:</div>
-                                    <IOSWheelPicker items={Array.from({length:60}, (_,i)=>i.toString().padStart(2,'0'))} selected={wMinute} onChange={setWMinute} width="w-16" />
-                                    <IOSWheelPicker items={["AM", "PM"]} selected={wAmPm} onChange={setWAmPm} width="w-16" />
+                                    {settings.timeFormat === '12h' ? (
+                                        <>
+                                            <IOSWheelPicker items={Array.from({length:12}, (_,i)=>(i+1).toString())} selected={wHour} onChange={setWHour} width="w-20" />
+                                            <div className="h-32 flex items-center font-bold text-gray-400 text-xl">:</div>
+                                            <IOSWheelPicker items={Array.from({length:60}, (_,i)=>i.toString().padStart(2,'0'))} selected={wMinute} onChange={setWMinute} width="w-20" />
+                                            <IOSWheelPicker items={['AM', 'PM']} selected={wAmPm} onChange={setWAmPm} width="w-20" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <IOSWheelPicker items={Array.from({length:24}, (_,i)=>i.toString().padStart(2,'0'))} selected={wHour} onChange={setWHour} width="w-20" />
+                                            <div className="h-32 flex items-center font-bold text-gray-400 text-xl">:</div>
+                                            <IOSWheelPicker items={Array.from({length:60}, (_,i)=>i.toString().padStart(2,'0'))} selected={wMinute} onChange={setWMinute} width="w-20" />
+                                        </>
+                                    )}
                                 </motion.div>}</AnimatePresence>
                             </div>
                         </div>
+
+                        {/* Priority */}
                         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm">
                             <span className="text-xs font-bold text-gray-400 uppercase mb-3 block">{t.priority}</span>
                             <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
                                 {[Priority.LOW, Priority.MEDIUM, Priority.HIGH].map(p => <button key={p} onClick={() => setFormPriority(p)} className={`flex-1 py-2 rounded-md text-sm font-semibold transition-all ${formPriority === p ? 'bg-blue-500 text-white' : 'text-gray-500'}`}>{p}</button>)}
                             </div>
                         </div>
+
+                        {/* ESTIMATED TIME (PROTECTED) */}
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm">
+                            <div className="flex justify-between items-center mb-3">
+                                <span className="text-xs font-bold text-gray-400 uppercase">ESTIMATED TIME</span>
+                                <span className="font-mono font-bold text-blue-500">{formatMinutes(formDuration)}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="5"
+                                max="120"
+                                step="5"
+                                value={formDuration}
+                                onChange={(e) => setFormDuration(Number(e.target.value))}
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                        </div>
+
+                        {/* POMODOROS (PROTECTED) */}
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-gray-400 uppercase">POMODOROS</span>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setFormPomodoros(Math.max(1, formPomodoros - 1))} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 active:scale-90 transition-transform font-bold">-</button>
+                                    <span className="font-bold text-xl text-gray-900 dark:text-white w-6 text-center">{formPomodoros}</span>
+                                    <button onClick={() => setFormPomodoros(Math.min(10, formPomodoros + 1))} className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 active:scale-90 transition-transform font-bold">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* NOTES (PROTECTED) */}
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm">
+                            <span className="text-xs font-bold text-gray-400 uppercase mb-2 block">NOTES</span>
+                            <textarea
+                                value={formNote}
+                                onChange={(e) => setFormNote(e.target.value)}
+                                className="w-full bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-sm text-gray-900 dark:text-white outline-none min-h-[80px] resize-none"
+                                placeholder="Add details..."
+                            />
+                        </div>
+
                         {editingTask && <button onClick={handleDelete} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl font-semibold flex items-center justify-center gap-2"><Trash2 size={18} /> {t.delete}</button>}
                     </div>
                     <div className="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700 w-full"><button onClick={handleSave} disabled={!formTitle.trim()} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-bold text-lg shadow-lg disabled:opacity-50">{editingTask ? t.save : t.create}</button></div>

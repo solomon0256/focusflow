@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Coffee, Zap, Armchair, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Brain, Calendar, X, SlidersHorizontal, RotateCcw, Plus, Bell, Headphones, Upload } from 'lucide-react';
@@ -7,6 +6,7 @@ import { IOSSegmentedControl } from '../components/IOSComponents';
 import { IOSWheelPicker } from '../components/IOSWheelPicker';
 import { SoundSelector } from '../components/SoundSelector'; // New
 import { translations } from '../utils/translations';
+import { getLocalDateString } from '../App';
 
 interface TimerViewProps {
   tasks: Task[];
@@ -23,6 +23,16 @@ const formatMinutes = (m: number) => {
     const min = m % 60;
     if (min === 0) return `${h}h`;
     return `${h}h ${min}m`;
+};
+
+// Helper: 12h Logic (Strict Unpadded Hour for iOS style) - Added for Task Card Display
+const to12h = (time24: string) => {
+    if (!time24) return { h12: '--', m: '--', ampm: '' };
+    const [hStr, mStr] = time24.split(':');
+    const h = parseInt(hStr, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return { h12: h12.toString(), m: mStr, ampm };
 };
 
 // Helper to calculate total cycle time
@@ -122,18 +132,32 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
       return Object.keys(modeLabels).find(key => modeLabels[key as TimerMode] === label) as TimerMode;
   };
 
-  // Auto-select logic
+  // Auto-select logic (Today First)
   useEffect(() => {
       if (sortedTasks.length === 0) return;
+      
+      const todayStr = getLocalDateString();
       const now = new Date();
+
+      // Priority 1: First uncompleted task for Today
+      const todayTaskIndex = sortedTasks.findIndex(t => t.date === todayStr && !t.completed);
+      
+      if (todayTaskIndex !== -1) {
+          setBrowsingTaskIndex(todayTaskIndex);
+          return;
+      }
+
+      // Priority 2: Next upcoming task (Standard logic)
       const nextTaskIndex = sortedTasks.findIndex(t => {
           const time = t.time || '23:59';
           const taskDate = new Date(`${t.date}T${time}`);
-          return taskDate > now;
+          return taskDate > now && !t.completed;
       });
+
       if (nextTaskIndex !== -1) {
           setBrowsingTaskIndex(nextTaskIndex);
       } else {
+          // Priority 3: Fallback to the last available task (likely future)
           setBrowsingTaskIndex(sortedTasks.length - 1);
       }
   }, [sortedTasks.length]);
@@ -277,6 +301,16 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
         case Priority.MEDIUM: return 'bg-yellow-500';
         case Priority.LOW: return 'bg-blue-500';
         default: return 'bg-gray-400';
+    }
+  };
+
+  // NEW: Helper for Border Colors (Ghost Cards)
+  const getPriorityBorderColor = (p: Priority) => {
+    switch (p) {
+        case Priority.HIGH: return 'border-red-500';
+        case Priority.MEDIUM: return 'border-yellow-500';
+        case Priority.LOW: return 'border-blue-500';
+        default: return 'border-gray-400';
     }
   };
 
@@ -597,75 +631,97 @@ const TimerView: React.FC<TimerViewProps> = ({ tasks, settings, setSettings, onS
             </div>
 
             {sortedTasks.length > 0 ? (
-                <div className="relative group w-full">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={currentTask?.id || 'empty'}
-                            initial={{ opacity: 0, x: 50 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -50 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={`bg-white dark:bg-gray-800 rounded-3xl shadow-md border-2 relative overflow-hidden transition-all duration-300
-                            ${selectedTaskId === currentTask?.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-transparent'}
-                            `}
-                        >
-                           {/* Priority Indicator Strip */}
-                           {currentTask && <div className={`absolute left-0 top-0 bottom-0 w-2 ${getPriorityColor(currentTask.priority)}`} />}
+                <div className="relative group w-full flex items-center justify-center gap-2">
+                    {/* Left Ghost Hint (UPDATED) */}
+                    <div className="w-4 h-24 flex-shrink-0 flex items-center justify-center cursor-pointer" onClick={handlePrevTask}>
+                       {browsingTaskIndex > 0 && (
+                           <div className={`w-full h-full rounded-r-lg blur-[1px] opacity-70 border-l-4 ${getPriorityBorderColor(sortedTasks[browsingTaskIndex-1].priority)} bg-gray-200 dark:bg-gray-700`}></div>
+                       )}
+                    </div>
 
-                           <div className="pl-5 p-4">
-                               {currentTask ? (
-                                   <>
-                                       <div className="flex justify-between items-start mb-3">
-                                           <div className="pr-2">
-                                                <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">{currentTask.title}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${getPriorityColor(currentTask.priority)}`}>
-                                                        {currentTask.priority}
-                                                    </span>
-                                                    <span className="text-xs text-gray-400 font-medium">
-                                                        {currentTask.date}
-                                                    </span>
+                    {/* Main Card Container */}
+                    <div className="flex-1 max-w-[95%] relative">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={currentTask?.id || 'empty'}
+                                initial={{ opacity: 0, x: 50 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -50 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                className={`bg-white dark:bg-gray-800 rounded-3xl shadow-md border-2 relative overflow-hidden transition-all duration-300
+                                ${selectedTaskId === currentTask?.id ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-transparent'}
+                                `}
+                            >
+                            {/* Priority Indicator Strip */}
+                            {currentTask && <div className={`absolute left-0 top-0 bottom-0 w-2 ${getPriorityColor(currentTask.priority)}`} />}
+
+                            <div className="pl-5 p-4">
+                                {currentTask ? (
+                                    <>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="pr-2">
+                                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1">{currentTask.title}</h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${getPriorityColor(currentTask.priority)}`}>
+                                                            {currentTask.priority}
+                                                        </span>
+                                                        <span className="text-xs text-gray-400 font-medium">
+                                                            {currentTask.date}
+                                                        </span>
+                                                    </div>
+                                            </div>
+                                            <button 
+                                                    onClick={handleSelectTask}
+                                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95
+                                                        ${selectedTaskId === currentTask.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 dark:bg-gray-700 text-gray-300'}
+                                                    `}
+                                                >
+                                                    {selectedTaskId === currentTask.id ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                                                </button>
+                                        </div>
+
+                                        {/* Metadata Grid */}
+                                        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{t.startLabel}</span>
+                                                <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
+                                                    <Clock size={14} className="text-blue-500"/>
+                                                    {/* UPDATED: Apply 12h formatting logic here */}
+                                                    {currentTask.time ? (settings.timeFormat === '12h' ? (() => {
+                                                        const { h12, m, ampm } = to12h(currentTask.time);
+                                                        return `${h12}:${m} ${ampm}`;
+                                                    })() : currentTask.time) : '--:--'}
                                                 </div>
-                                           </div>
-                                           <button 
-                                                onClick={handleSelectTask}
-                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95
-                                                    ${selectedTaskId === currentTask.id ? 'bg-blue-500 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 dark:bg-gray-700 text-gray-300'}
-                                                `}
-                                            >
-                                                {selectedTaskId === currentTask.id ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                                            </button>
-                                       </div>
+                                            </div>
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
+                                                <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
+                                                        <Calendar size={14} className="text-purple-500"/>
+                                                    {formatMinutes(currentTask.durationMinutes)}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
+                                                <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
+                                                        <Zap size={14} className="text-yellow-500"/>
+                                                        {currentTask.pomodoroCount}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : <div></div>}
+                            </div>
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
 
-                                       {/* Metadata Grid */}
-                                       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                                           <div className="flex flex-col items-start">
-                                               <span className="text-[10px] font-bold text-gray-400 uppercase">{t.startLabel}</span>
-                                               <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
-                                                   <Clock size={14} className="text-blue-500"/>
-                                                   {currentTask.time || '--:--'}
-                                               </div>
-                                           </div>
-                                           <div className="flex flex-col items-start">
-                                               <span className="text-[10px] font-bold text-gray-400 uppercase">{t.duration}</span>
-                                               <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
-                                                    <Calendar size={14} className="text-purple-500"/>
-                                                   {formatMinutes(currentTask.durationMinutes)}
-                                               </div>
-                                           </div>
-                                           <div className="flex flex-col items-start">
-                                               <span className="text-[10px] font-bold text-gray-400 uppercase">{t.pomos}</span>
-                                               <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 font-semibold text-sm">
-                                                    <Zap size={14} className="text-yellow-500"/>
-                                                    {currentTask.pomodoroCount}
-                                               </div>
-                                           </div>
-                                       </div>
-                                   </>
-                               ) : <div></div>}
-                           </div>
-                        </motion.div>
-                    </AnimatePresence>
+                    {/* Right Ghost Hint (UPDATED) */}
+                    <div className="w-4 h-24 flex-shrink-0 flex items-center justify-center cursor-pointer" onClick={handleNextTask}>
+                        {browsingTaskIndex < sortedTasks.length - 1 && (
+                             <div className={`w-full h-full rounded-l-lg blur-[1px] opacity-70 border-r-4 ${getPriorityBorderColor(sortedTasks[browsingTaskIndex+1].priority)} bg-gray-200 dark:bg-gray-700`}></div>
+                        )}
+                    </div>
+                    
                      <div className="absolute top-1/2 -translate-y-1/2 w-full flex justify-between pointer-events-none px-0 z-20">
                         <button onClick={handlePrevTask} disabled={browsingTaskIndex === 0} className="pointer-events-auto w-10 h-10 -ml-4 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 dark:text-gray-300 hover:text-blue-500"><ChevronLeft size={24} /></button>
                         <button onClick={handleNextTask} disabled={browsingTaskIndex >= sortedTasks.length - 1} className="pointer-events-auto w-10 h-10 -mr-4 bg-white dark:bg-gray-700 shadow-lg rounded-full flex items-center justify-center disabled:opacity-0 transition-opacity text-gray-600 dark:text-gray-300 hover:text-blue-500"><ChevronRight size={24} /></button>

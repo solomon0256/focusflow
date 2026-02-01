@@ -20,7 +20,14 @@ export const IOSWheelPicker: React.FC<WheelPickerProps> = ({ items, selected, on
     if (scrollRef.current && !isScrolling) {
       const index = items.indexOf(selected);
       if (index !== -1) {
-        scrollRef.current.scrollTop = index * ITEM_HEIGHT;
+        // FIX: Use setTimeout (50ms) to ensure layout is fully rendered before scrolling.
+        // This is critical when the component is inside a Framer Motion AnimatePresence
+        // which might report height=0 initially, causing scrollTop to fail.
+        setTimeout(() => {
+            if (scrollRef.current) {
+                scrollRef.current.scrollTop = index * ITEM_HEIGHT;
+            }
+        }, 50);
       }
     }
   }, [selected, items, isScrolling]);
@@ -42,9 +49,6 @@ export const IOSWheelPicker: React.FC<WheelPickerProps> = ({ items, selected, on
           // Clamp index
           const safeIndex = Math.max(0, Math.min(index, items.length - 1));
           
-          // Snap visually if needed (optional, native snap-y usually handles this)
-          // scrollRef.current.scrollTo({ top: safeIndex * ITEM_HEIGHT, behavior: 'smooth' });
-
           const newValue = items[safeIndex];
           if (newValue !== selected) {
             onChange(newValue);
@@ -57,14 +61,14 @@ export const IOSWheelPicker: React.FC<WheelPickerProps> = ({ items, selected, on
   return (
     <div className={`flex flex-col items-center ${width}`}>
       {label && <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-wider">{label}</span>}
-      <div className="relative h-32 w-full overflow-hidden bg-gray-50 rounded-xl border border-gray-100 group">
+      <div className="relative h-32 w-full overflow-hidden bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 group">
         
         {/* Selection Highlight Bar (Center) */}
-        <div className="absolute top-[44px] left-0 right-0 h-[40px] bg-white shadow-sm border-t border-b border-blue-100 z-0 pointer-events-none opacity-80" />
+        <div className="absolute top-[44px] left-0 right-0 h-[40px] bg-white dark:bg-gray-700 shadow-sm border-t border-b border-blue-100 dark:border-blue-900/30 z-0 pointer-events-none opacity-80" />
         
         {/* Gradients to fade top/bottom */}
-        <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-gray-50 to-transparent z-10 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-50 to-transparent z-10 pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-gray-50 dark:from-gray-800 to-transparent z-10 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-50 dark:from-gray-800 to-transparent z-10 pointer-events-none" />
 
         {/* Scroll Container */}
         <div 
@@ -77,7 +81,7 @@ export const IOSWheelPicker: React.FC<WheelPickerProps> = ({ items, selected, on
             <div 
               key={i} 
               className={`h-[40px] flex items-center justify-center snap-center transition-opacity duration-200 cursor-pointer
-                ${item === selected ? 'text-gray-900 font-bold text-lg scale-105' : 'text-gray-400 font-medium text-sm'}
+                ${item === selected ? 'text-gray-900 dark:text-white font-bold text-lg scale-105' : 'text-gray-400 dark:text-gray-500 font-medium text-sm'}
               `}
               onClick={() => {
                   // Allow clicking to select

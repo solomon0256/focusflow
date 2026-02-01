@@ -44,6 +44,7 @@ function App() {
       workTime: 25, shortBreakTime: 5, longBreakTime: 15, pomodorosPerRound: 4,
       notifications: [], customNotifications: [], stopwatchNotifications: [],
       language: 'en', batterySaverMode: false, theme: 'system',
+      timeFormat: '24h', // Default to 24h
       soundEnabled: false, soundMode: 'timer', selectedSoundId: 'none', soundVolume: 0.5
   });
 
@@ -112,10 +113,85 @@ function App() {
 
   const handleSessionComplete = (minutes: number, taskCompleted: boolean = false, avgScore: number = 100) => {
       if (currentSessionParams) {
+          // 1. Add History Record
           const newRecord: FocusRecord = { id: Date.now().toString(), date: getLocalDateString(), durationMinutes: minutes, mode: currentSessionParams.mode, score: avgScore };
           setFocusHistory(prev => [...prev, newRecord]);
+          
+          // 2. Mark Task as Complete
           if (currentSessionParams.taskId && taskCompleted) {
               setTasks(prev => prev.map(t => t.id === currentSessionParams.taskId ? { ...t, completed: true } : t));
+          }
+
+          // 3. Economy System (Strictly following PET_SYSTEM_DESIGN.md)
+          if (user) {
+              const todayStr = getLocalDateString();
+              const lastActive = user.pet.lastDailyActivityDate;
+              let newStreak = user.pet.streakCount;
+              let isFirstSessionToday = false;
+
+              // STREAK LOGIC:
+              // Only increment if last activity was strictly yesterday.
+              // If last activity was today, streak remains same.
+              // If last activity was older than yesterday, reset to 1.
+              if (lastActive !== todayStr) {
+                  isFirstSessionToday = true;
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  const yesterdayStr = getLocalDateString(yesterday);
+
+                  if (lastActive === yesterdayStr) {
+                      newStreak += 1; // Continued streak
+                  } else {
+                      newStreak = 1; // Streak broken or new user
+                  }
+              }
+
+              // EXP LOGIC (Per PET_SYSTEM_DESIGN.md):
+              // Rule 1: "每专注 25 分钟可获得 10 EXP" -> (minutes / 25) * 10
+              let baseExp = (minutes / 25) * 10;
+              
+              // Rule 2: "如果专注评分 > 90，该时段 EXP 收益增加 50%"
+              if (avgScore > 90) {
+                  baseExp = baseExp * 1.5;
+              }
+
+              // Rule 3: "每日登录并完成一轮专注，额外获得连胜 EXP"
+              // We award this only on the first session of the day
+              let streakBonusExp = 0;
+              if (isFirstSessionToday) {
+                  // Simple tier for streak bonus
+                  if (newStreak >= 7) streakBonusExp = 20;
+                  else if (newStreak >= 3) streakBonusExp = 10;
+                  else streakBonusExp = 5;
+              }
+
+              // Total Calculation (Floor to integer as per gaming standards)
+              const totalEarnedExp = Math.floor(baseExp + streakBonusExp);
+
+              let newCurrentExp = user.pet.currentExp + totalEarnedExp;
+              let newLevel = user.pet.level;
+              let newMaxExp = user.pet.maxExp;
+
+              // Level Up Logic
+              while (newCurrentExp >= newMaxExp) {
+                  newCurrentExp -= newMaxExp;
+                  newLevel += 1;
+                  // Increase requirement by 20% each level
+                  newMaxExp = Math.floor(newMaxExp * 1.2); 
+              }
+
+              setUser(prev => prev ? ({
+                  ...prev,
+                  pet: {
+                      ...prev.pet,
+                      level: newLevel,
+                      currentExp: newCurrentExp,
+                      maxExp: newMaxExp,
+                      streakCount: newStreak,
+                      lastDailyActivityDate: todayStr,
+                      happiness: Math.min(100, prev.pet.happiness + 5) // Increase happiness on activity
+                  }
+              }) : null);
           }
       }
       setIsFocusSessionActive(false); setSessionPhase('IDLE'); setCurrentSessionParams(null);

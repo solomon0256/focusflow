@@ -36,6 +36,8 @@ export type SoundMode = 'timer' | 'always';
 
 export type ThemeMode = 'system' | 'light' | 'dark'; // New Theme Type
 
+export type TimeFormat = '12h' | '24h'; // New Time Format Type
+
 export interface Settings {
   workTime: number;
   shortBreakTime: number;
@@ -49,6 +51,9 @@ export interface Settings {
   
   // --- THEME SETTINGS ---
   theme: ThemeMode;
+
+  // --- PREFERENCES ---
+  timeFormat: TimeFormat;
 
   // --- AUDIO SETTINGS ---
   soundEnabled: boolean;
