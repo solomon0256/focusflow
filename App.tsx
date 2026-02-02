@@ -18,6 +18,36 @@ const STORAGE_KEYS = {
     USER: 'focusflow_user'
 };
 
+// --- NEW LEVEL SYSTEM CONFIGURATION ---
+// Levels 1-25. 'req' is the EXP needed to go from this level to the next.
+const LEVEL_CONFIG = [
+    { level: 1, req: 800 },   // Kindergarten
+    { level: 2, req: 1000 },  // Grade 1
+    { level: 3, req: 1200 },  // Grade 2
+    { level: 4, req: 1400 },  // Grade 3
+    { level: 5, req: 1600 },  // Grade 4
+    { level: 6, req: 1800 },  // Grade 5
+    { level: 7, req: 2000 },  // Grade 6
+    { level: 8, req: 2200 },  // Grade 7
+    { level: 9, req: 2400 },  // Grade 8
+    { level: 10, req: 2600 }, // Grade 9
+    { level: 11, req: 2900 }, // Grade 10
+    { level: 12, req: 3200 }, // Grade 11
+    { level: 13, req: 3500 }, // Grade 12
+    { level: 14, req: 3800 }, // Freshman
+    { level: 15, req: 4200 }, // Sophomore
+    { level: 16, req: 4600 }, // Junior
+    { level: 17, req: 5000 }, // Senior
+    { level: 18, req: 5800 }, // Master I
+    { level: 19, req: 6600 }, // Master II
+    { level: 20, req: 7600 }, // PhD I
+    { level: 21, req: 8800 }, // PhD II
+    { level: 22, req: 10200 },// PhD III
+    { level: 23, req: 11800 },// Postdoc
+    { level: 24, req: 13500 },// Assistant Professor
+    { level: 25, req: 999999 }// Professor (Max)
+];
+
 export const getLocalDateString = (date: Date = new Date()) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -59,7 +89,7 @@ function App() {
                 NativeService.Storage.get<FocusRecord[]>(STORAGE_KEYS.HISTORY)
             ]);
             if (u) setUser(u);
-            else setUser({ id: 'guest_' + Date.now(), name: 'Guest', email: '', isPremium: false, pet: { level: 1, currentExp: 0, maxExp: 300, happiness: 100, streakCount: 0, lastDailyActivityDate: '' } });
+            else setUser({ id: 'guest_' + Date.now(), name: 'Guest', email: '', isPremium: false, pet: { level: 1, currentExp: 0, maxExp: 800, happiness: 100, streakCount: 0, lastDailyActivityDate: '' } });
             if (s) setSettings(prev => ({ ...prev, ...s }));
             if (t) setTasks(t);
             else setTasks([{ id: '1', title: 'Welcome to FocusFlow', date: getLocalDateString(), time: '09:00', durationMinutes: 25, priority: Priority.HIGH, completed: false, pomodoroCount: 1, note: 'This is a local-first app.' }]);
@@ -122,14 +152,16 @@ function App() {
               setTasks(prev => prev.map(t => t.id === currentSessionParams.taskId ? { ...t, completed: true } : t));
           }
 
-          // 3. Economy System: Update Streak, EXP, and Level
+          // 3. Economy System: 25-Level Architecture
           if (user) {
               const todayStr = getLocalDateString();
               const lastActive = user.pet.lastDailyActivityDate;
               let newStreak = user.pet.streakCount;
 
               // Streak Logic
+              let isFirstLoginToday = false;
               if (lastActive !== todayStr) {
+                  isFirstLoginToday = true;
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
                   const yesterdayStr = getLocalDateString(yesterday);
@@ -141,36 +173,50 @@ function App() {
                   }
               }
 
-              // EXP Logic
-              // Base: 1 EXP per minute
+              // --- EXP CALCULATION RULES ---
+              // Rule 1: 1 min = 1 EXP (25 min = 25 EXP)
               let earnedExp = Math.floor(minutes);
-              // Bonus: Task Completion (+10%)
-              if (taskCompleted) earnedExp += Math.floor(minutes * 0.1);
-              // Bonus: High Quality Focus (+20%)
-              if (avgScore >= 80) earnedExp += Math.floor(minutes * 0.2);
               
-              // Ensure minimum 1 EXP for short sessions
-              earnedExp = Math.max(1, earnedExp);
-
-              let newCurrentExp = user.pet.currentExp + earnedExp;
-              let newLevel = user.pet.level;
-              let newMaxExp = user.pet.maxExp;
-
-              // Level Up Logic
-              while (newCurrentExp >= newMaxExp) {
-                  newCurrentExp -= newMaxExp;
-                  newLevel += 1;
-                  // Increase requirement by 20% each level
-                  newMaxExp = Math.floor(newMaxExp * 1.2); 
+              // Rule 2: Task Completion Bonus = +25 EXP
+              if (taskCompleted) {
+                  earnedExp += 25;
               }
+              
+              // Rule 3: Daily Login Bonus = +20 EXP (First session of the day)
+              if (isFirstLoginToday) {
+                  earnedExp += 20;
+              }
+
+              // Apply Score Multiplier (Implicit in base minutes, but we can add flow bonus)
+              // If High Quality Focus (avgScore >= 90), add 10% bonus
+              if (avgScore >= 90) {
+                  earnedExp += Math.floor(minutes * 0.1);
+              }
+
+              let currentExp = user.pet.currentExp + earnedExp;
+              let currentLevel = user.pet.level;
+
+              // --- LEVEL UP LOGIC (Lookup Table) ---
+              // Find config for current level (Adjust for 0-based index: Level 1 is index 0)
+              let levelConfig = LEVEL_CONFIG[currentLevel - 1]; 
+              
+              // While we have enough EXP to advance, and we are not at MAX level
+              while (levelConfig && currentExp >= levelConfig.req && currentLevel < 25) {
+                  currentExp -= levelConfig.req;
+                  currentLevel += 1;
+                  levelConfig = LEVEL_CONFIG[currentLevel - 1]; // Update config for next iteration
+              }
+
+              // Update MaxExp for display (Requirement for NEXT level)
+              const nextLevelReq = LEVEL_CONFIG[currentLevel - 1] ? LEVEL_CONFIG[currentLevel - 1].req : 999999;
 
               setUser(prev => prev ? ({
                   ...prev,
                   pet: {
                       ...prev.pet,
-                      level: newLevel,
-                      currentExp: newCurrentExp,
-                      maxExp: newMaxExp,
+                      level: currentLevel,
+                      currentExp: currentExp,
+                      maxExp: nextLevelReq,
                       streakCount: newStreak,
                       lastDailyActivityDate: todayStr,
                       happiness: Math.min(100, prev.pet.happiness + 5) // Increase happiness
@@ -198,7 +244,7 @@ function App() {
             activeTab === 'timer' ? <TimerView tasks={tasks.filter(t => !t.completed)} settings={settings} setSettings={setSettings} onRecordTime={()=>{}} onStartSession={(d, m, tId) => { setCurrentSessionParams({ durationMinutes: d, mode: m, taskId: tId }); setIsFocusSessionActive(true); setSessionPhase('WORK'); }} /> :
             activeTab === 'tasks' ? <TasksView tasks={tasks} settings={settings} addTask={t => setTasks(prev => [...prev, t])} updateTask={t => setTasks(prev => prev.map(x => x.id === t.id ? t : x))} deleteTask={id => setTasks(prev => prev.filter(x => x.id !== id))} toggleTask={id => setTasks(prev => prev.map(x => x.id === id ? { ...x, completed: !x.completed } : x))} /> :
             activeTab === 'stats' ? <StatsView tasks={tasks} focusHistory={focusHistory} settings={settings} /> :
-            <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} />
+            <SettingsView settings={settings} setSettings={setSettings} user={user} onLogin={() => setUser(prev => prev ? {...prev, name: 'Apple User'} : null)} onLogout={() => setUser(null)} onUpgrade={() => setUser(prev => prev ? {...prev, isPremium: true} : null)} onInjectData={(t, h, u) => { setTasks(t); setFocusHistory(h); setUser(u); }} />
         )}
       </main>
       {!isFocusSessionActive && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} settings={settings} />}

@@ -1,3 +1,5 @@
+
+
 import { LanguageCode } from '../types';
 
 // Map of language codes to display names
@@ -73,7 +75,13 @@ const en = {
     mood_focused: 'Focused',
     mood_low: 'Low Energy',
     mood_distracted: 'Distracted',
-    academicRanks: ['Novice', 'Apprentice', 'Scholar', 'Master', 'Grandmaster'],
+    academicRanks: [
+        'Kindergarten', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4',
+        'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9',
+        'Grade 10', 'Grade 11', 'Grade 12', 'Freshman', 'Sophomore',
+        'Junior', 'Senior', 'Master I', 'Master II', 'PhD I',
+        'PhD II', 'PhD III', 'Postdoc', 'Asst. Prof', 'Professor'
+    ],
     streakDetail: 'Day {n}, +{e} EXP',
     companion: 'Companion',
     petName: 'Focus Fox',
@@ -196,7 +204,14 @@ const zh: typeof en = {
     stats: {
         ...en.stats,
         title: '数据统计', mood_sleeping: '未开始', mood_flow: '心流状态', mood_focused: '专注', mood_low: '状态低迷', mood_distracted: '分心',
-        academicRanks: ['新手', '学徒', '学者', '大师', '宗师'], streakDetail: '坚持 {n} 天, +{e} 经验', companion: '专注伴侣',
+        academicRanks: [
+            '幼儿园', '一年级', '二年级', '三年级', '四年级',
+            '五年级', '六年级', '七年级', '八年级', '九年级',
+            '十年级', '十一年级', '十二年级', '大一', '大二',
+            '大三', '大四', '硕士 I', '硕士 II', '博士 I',
+            '博士 II', '博士 III', '博士后', '助理教授', '教授'
+        ],
+        streakDetail: '坚持 {n} 天, +{e} 经验', companion: '专注伴侣',
         petName: 'Focus Fox', streakTitle: '连胜', todaysVibe: '今日状态', avgScore: '平均分', weeklyActivity: '本周活动', last7Days: '近7天'
     },
     settings: {
@@ -248,7 +263,14 @@ const zhTW: typeof en = {
     stats: {
         ...en.stats,
         title: '數據統計', mood_sleeping: '未開始', mood_flow: '心流狀態', mood_focused: '專注', mood_low: '狀態低迷', mood_distracted: '分心',
-        academicRanks: ['新手', '學徒', '學者', '大師', '宗師'], streakDetail: '堅持 {n} 天, +{e} 經驗', companion: '專注伴侶',
+        academicRanks: [
+            '幼兒園', '一年級', '二年級', '三年級', '四年級',
+            '五年級', '六年級', '七年級', '八年級', '九年級',
+            '十年級', '十一年級', '十二年級', '大一', '大二',
+            '大三', '大四', '碩士 I', '碩士 II', '博士 I',
+            '博士 II', '博士 III', '博士後', '助理教授', '教授'
+        ],
+        streakDetail: '堅持 {n} 天, +{e} 經驗', companion: '專注伴侶',
         petName: 'Focus Fox', streakTitle: '連勝', todaysVibe: '今日狀態', avgScore: '平均分', weeklyActivity: '本週活動', last7Days: '近7天'
     },
     settings: {
@@ -300,6 +322,13 @@ const fr: typeof en = {
     stats: {
         ...en.stats,
         title: 'Statistiques', mood_sleeping: 'Inactif', mood_flow: 'Flux profond', mood_focused: 'Concentré', mood_low: 'Énergie faible', mood_distracted: 'Distrait',
+        academicRanks: [
+            'Maternelle', 'CP', 'CE1', 'CE2', 'CM1',
+            'CM2', '6ème', '5ème', '4ème', '3ème',
+            '2nde', '1ère', 'Terminale', 'Licence 1', 'Licence 2',
+            'Licence 3', 'Master 1', 'Master 2', 'Doctorat 1', 'Doctorat 2',
+            'Doctorat 3', 'Post-doc', 'Maître de conf.', 'Professeur', 'Professeur'
+        ],
         streakDetail: 'Jour {n}, +{e} EXP', companion: 'Compagnon', petName: 'Renard Focus', streakTitle: 'Série', todaysVibe: "Humeur du jour",
         avgScore: 'Score moy.', weeklyActivity: 'Activité hebdo', last7Days: '7 derniers jours'
     },
@@ -343,6 +372,13 @@ const de: typeof en = {
     stats: {
         ...en.stats,
         title: 'Statistik', mood_sleeping: 'Schlafend', mood_flow: 'Deep Flow', mood_focused: 'Fokussiert', mood_low: 'Wenig Energie', mood_distracted: 'Abgelenkt',
+        academicRanks: [
+            'Kindergarten', 'Klasse 1', 'Klasse 2', 'Klasse 3', 'Klasse 4',
+            'Klasse 5', 'Klasse 6', 'Klasse 7', 'Klasse 8', 'Klasse 9',
+            'Klasse 10', 'Klasse 11', 'Klasse 12', 'Bachelor 1', 'Bachelor 2',
+            'Bachelor 3', 'Master 1', 'Master 2', 'PhD 1', 'PhD 2',
+            'PhD 3', 'Postdoc', 'Assistenzprof.', 'Professor', 'Professor'
+        ],
         streakDetail: 'Tag {n}, +{e} EXP', companion: 'Begleiter', petName: 'Fokus-Fuchs', streakTitle: 'Serie', todaysVibe: "Stimmung",
         avgScore: 'Ø Score', weeklyActivity: 'Wochenaktivität', last7Days: 'Letzte 7 Tage'
     },
@@ -386,6 +422,13 @@ const es: typeof en = {
     stats: {
         ...en.stats,
         title: 'Estadísticas', mood_sleeping: 'Durmiendo', mood_flow: 'Flujo Profundo', mood_focused: 'Enfocado', mood_low: 'Baja Energía', mood_distracted: 'Distraído',
+        academicRanks: [
+            'Jardín', 'Grado 1', 'Grado 2', 'Grado 3', 'Grado 4',
+            'Grado 5', 'Grado 6', 'Grado 7', 'Grado 8', 'Grado 9',
+            'Grado 10', 'Grado 11', 'Grado 12', 'Estudiante 1', 'Estudiante 2',
+            'Estudiante 3', 'Estudiante 4', 'Maestría I', 'Maestría II', 'Doctorado I',
+            'Doctorado II', 'Doctorado III', 'Postdoc', 'Profesor Asist.', 'Profesor'
+        ],
         streakDetail: 'Día {n}, +{e} EXP', companion: 'Compañero', petName: 'Zorro Focus', streakTitle: 'Racha', todaysVibe: "Vibra de hoy",
         avgScore: 'Puntaje Prom.', weeklyActivity: 'Actividad Semanal', last7Days: 'Últimos 7 días'
     },
@@ -429,6 +472,13 @@ const ja: typeof en = {
     stats: {
         ...en.stats,
         title: '統計', mood_sleeping: '未活動', mood_flow: '超集中', mood_focused: '集中', mood_low: '低調', mood_distracted: '散漫',
+        academicRanks: [
+            '幼稚園', '小学1年', '小学2年', '小学3年', '小学4年',
+            '小学5年', '小学6年', '中学1年', '中学2年', '中学3年',
+            '高校1年', '高校2年', '高校3年', '大学1年', '大学2年',
+            '大学3年', '大学4年', '修士1', '修士2', '博士1',
+            '博士2', '博士3', 'ポスドク', '助教', '教授'
+        ],
         streakDetail: '{n}日目, +{e} EXP', companion: 'パートナー', petName: 'フォーカス狐', streakTitle: '連続', todaysVibe: "今日の気分",
         avgScore: '平均スコア', weeklyActivity: '週間活動', last7Days: '過去7日間'
     },
@@ -472,6 +522,13 @@ const ko: typeof en = {
     stats: {
         ...en.stats,
         title: '통계', mood_sleeping: '수면', mood_flow: '몰입', mood_focused: '집중', mood_low: '에너지 낮음', mood_distracted: '산만',
+        academicRanks: [
+            '유치원', '1학년', '2학년', '3학년', '4학년',
+            '5학년', '6학년', '중1', '중2', '중3',
+            '고1', '고2', '고3', '대1', '대2',
+            '대3', '대4', '석사1', '석사2', '박사1',
+            '박사2', '박사3', '포닥', '조교수', '교수'
+        ],
         streakDetail: '{n}일차, +{e} EXP', companion: '파트너', petName: '포커스 여우', streakTitle: '연속', todaysVibe: "오늘의 상태",
         avgScore: '평균 점수', weeklyActivity: '주간 활동', last7Days: '최근 7일'
     },
@@ -515,6 +572,13 @@ const ru: typeof en = {
     stats: {
         ...en.stats,
         title: 'Статистика', mood_sleeping: 'Спит', mood_flow: 'Поток', mood_focused: 'Фокус', mood_low: 'Мало сил', mood_distracted: 'Отвлечен',
+        academicRanks: [
+            'Садик', '1 класс', '2 класс', '3 класс', '4 класс',
+            '5 класс', '6 класс', '7 класс', '8 класс', '9 класс',
+            '10 класс', '11 класс', '12 класс', '1 курс', '2 курс',
+            '3 курс', '4 курс', 'Магистр 1', 'Магистр 2', 'Аспирант 1',
+            'Аспирант 2', 'Аспирант 3', 'Доктор', 'Доцент', 'Профессор'
+        ],
         streakDetail: 'День {n}, +{e} EXP', companion: 'Питомец', petName: 'Фокус Лис', streakTitle: 'Серия', todaysVibe: "Настрой",
         avgScore: 'Ср. балл', weeklyActivity: 'Активность', last7Days: '7 дней'
     },
@@ -558,6 +622,13 @@ const ar: typeof en = {
     stats: {
         ...en.stats,
         title: 'الإحصائيات', mood_sleeping: 'نائم', mood_flow: 'تدفق عميق', mood_focused: 'مركز', mood_low: 'طاقة منخفضة', mood_distracted: 'مشتت',
+        academicRanks: [
+            'روضة أطفال', 'الصف 1', 'الصف 2', 'الصف 3', 'الصف 4',
+            'الصف 5', 'الصف 6', 'الصف 7', 'الصف 8', 'الصف 9',
+            'الصف 10', 'الصف 11', 'الصف 12', 'جامعة 1', 'جامعة 2',
+            'جامعة 3', 'جامعة 4', 'ماجستير 1', 'ماجستير 2', 'دكتوراه 1',
+            'دكتوراه 2', 'دكتوراه 3', 'ما بعد الدكتوراه', 'أستاذ مساعد', 'أستاذ'
+        ],
         streakDetail: 'يوم {n}, +{e} خبرة', companion: 'الرفيق', petName: 'ثعلب التركيز', streakTitle: 'التتابع', todaysVibe: "مزاج اليوم",
         avgScore: 'متوسط النقاط', weeklyActivity: 'النشاط الأسبوعي', last7Days: 'آخر 7 أيام'
     },
@@ -601,6 +672,13 @@ const hi: typeof en = {
     stats: {
         ...en.stats,
         title: 'सांख्यिकी', mood_sleeping: 'निष्क्रिय', mood_flow: 'गहन प्रवाह', mood_focused: 'केंद्रित', mood_low: 'कम ऊर्जा', mood_distracted: 'विचलित',
+        academicRanks: [
+            'के.जी.', 'कक्षा 1', 'कक्षा 2', 'कक्षा 3', 'कक्षा 4',
+            'कक्षा 5', 'कक्षा 6', 'कक्षा 7', 'कक्षा 8', 'कक्षा 9',
+            'कक्षा 10', 'कक्षा 11', 'कक्षा 12', 'स्नातक 1', 'स्नातक 2',
+            'स्नातक 3', 'स्नातक 4', 'मास्टर्स 1', 'मास्टर्स 2', 'पीएचडी 1',
+            'पीएचडी 2', 'पीएचडी 3', 'पोस्ट-डॉक', 'सहायक प्रोफेसर', 'प्रोफेसर'
+        ],
         streakDetail: 'दिन {n}, +{e} EXP', companion: 'साथी', petName: 'फोकस फॉक्स', streakTitle: 'लगातार', todaysVibe: "आज का मूड",
         avgScore: 'औसत स्कोर', weeklyActivity: 'साप्ताहिक गतिविधि', last7Days: 'पिछले 7 दिन'
     },
