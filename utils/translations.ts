@@ -89,6 +89,11 @@ const en = {
     avgScore: 'Avg Score',
     weeklyActivity: 'Weekly Activity',
     last7Days: 'Last 7 Days',
+    // NEW: Daily Goals Localization
+    dailyGoalsTitle: 'Daily Goals',
+    goal_login: 'Daily Login',
+    goal_task: 'Complete 1 Task',
+    goal_focus: 'Focus 1 Hour',
   },
   settings: {
     title: 'Settings',
@@ -211,7 +216,12 @@ const zh: typeof en = {
             '博士 II', '博士 III', '博士后', '助理教授', '教授'
         ],
         streakDetail: '坚持 {n} 天, +{e} 经验', companion: '专注伴侣',
-        petName: 'Focus Fox', streakTitle: '连胜', todaysVibe: '今日状态', avgScore: '平均分', weeklyActivity: '本周活动', last7Days: '近7天'
+        petName: 'Focus Fox', streakTitle: '连胜', todaysVibe: '今日状态', avgScore: '平均分', weeklyActivity: '本周活动', last7Days: '近7天',
+        // NEW
+        dailyGoalsTitle: '每日目标',
+        goal_login: '每日登录',
+        goal_task: '完成 1 个任务',
+        goal_focus: '专注 1 小时',
     },
     settings: {
         ...en.settings,
@@ -270,7 +280,12 @@ const zhTW: typeof en = {
             '博士 II', '博士 III', '博士後', '助理教授', '教授'
         ],
         streakDetail: '堅持 {n} 天, +{e} 經驗', companion: '專注伴侶',
-        petName: 'Focus Fox', streakTitle: '連勝', todaysVibe: '今日狀態', avgScore: '平均分', weeklyActivity: '本週活動', last7Days: '近7天'
+        petName: 'Focus Fox', streakTitle: '連勝', todaysVibe: '今日狀態', avgScore: '平均分', weeklyActivity: '本週活動', last7Days: '近7天',
+        // NEW
+        dailyGoalsTitle: '每日目標',
+        goal_login: '每日登錄',
+        goal_task: '完成 1 個任務',
+        goal_focus: '專注 1 小時',
     },
     settings: {
         ...en.settings,
@@ -329,7 +344,12 @@ const fr: typeof en = {
             'Doctorat 3', 'Post-doc', 'Maître de conf.', 'Professeur', 'Professeur'
         ],
         streakDetail: 'Jour {n}, +{e} EXP', companion: 'Compagnon', petName: 'Renard Focus', streakTitle: 'Série', todaysVibe: "Humeur du jour",
-        avgScore: 'Score moy.', weeklyActivity: 'Activité hebdo', last7Days: '7 derniers jours'
+        avgScore: 'Score moy.', weeklyActivity: 'Activité hebdo', last7Days: '7 derniers jours',
+        // NEW
+        dailyGoalsTitle: 'Objectifs',
+        goal_login: 'Connexion',
+        goal_task: '1 Tâche',
+        goal_focus: '1 Heure Focus',
     },
     settings: {
         ...en.settings,
@@ -379,7 +399,12 @@ const de: typeof en = {
             'PhD 3', 'Postdoc', 'Assistenzprof.', 'Professor', 'Professor'
         ],
         streakDetail: 'Tag {n}, +{e} EXP', companion: 'Begleiter', petName: 'Fokus-Fuchs', streakTitle: 'Serie', todaysVibe: "Stimmung",
-        avgScore: 'Ø Score', weeklyActivity: 'Wochenaktivität', last7Days: 'Letzte 7 Tage'
+        avgScore: 'Ø Score', weeklyActivity: 'Wochenaktivität', last7Days: 'Letzte 7 Tage',
+        // NEW
+        dailyGoalsTitle: 'Tagesziele',
+        goal_login: 'Täglicher Login',
+        goal_task: '1 Aufgabe',
+        goal_focus: '1 Std. Fokus',
     },
     settings: {
         ...en.settings,
@@ -429,7 +454,12 @@ const es: typeof en = {
             'Doctorado II', 'Doctorado III', 'Postdoc', 'Profesor Asist.', 'Profesor'
         ],
         streakDetail: 'Día {n}, +{e} EXP', companion: 'Compañero', petName: 'Zorro Focus', streakTitle: 'Racha', todaysVibe: "Vibra de hoy",
-        avgScore: 'Puntaje Prom.', weeklyActivity: 'Actividad Semanal', last7Days: 'Últimos 7 días'
+        avgScore: 'Puntaje Prom.', weeklyActivity: 'Actividad Semanal', last7Days: 'Últimos 7 días',
+        // NEW
+        dailyGoalsTitle: 'Objetivos',
+        goal_login: 'Login Diario',
+        goal_task: '1 Tarea',
+        goal_focus: '1 Hora Foco',
     },
     settings: {
         ...en.settings,
@@ -479,7 +509,12 @@ const ja: typeof en = {
             '博士2', '博士3', 'ポスドク', '助教', '教授'
         ],
         streakDetail: '{n}日目, +{e} EXP', companion: 'パートナー', petName: 'フォーカス狐', streakTitle: '連続', todaysVibe: "今日の気分",
-        avgScore: '平均スコア', weeklyActivity: '週間活動', last7Days: '過去7日間'
+        avgScore: '平均スコア', weeklyActivity: '週間活動', last7Days: '過去7日間',
+        // NEW
+        dailyGoalsTitle: 'デイリー目標',
+        goal_login: 'ログイン',
+        goal_task: 'タスク1件',
+        goal_focus: '1時間集中',
     },
     settings: {
         ...en.settings,
@@ -529,7 +564,12 @@ const ko: typeof en = {
             '박사2', '박사3', '포닥', '조교수', '교수'
         ],
         streakDetail: '{n}일차, +{e} EXP', companion: '파트너', petName: '포커스 여우', streakTitle: '연속', todaysVibe: "오늘의 상태",
-        avgScore: '평균 점수', weeklyActivity: '주간 활동', last7Days: '최근 7일'
+        avgScore: '평균 점수', weeklyActivity: '주간 활동', last7Days: '최근 7일',
+        // NEW
+        dailyGoalsTitle: '일일 목표',
+        goal_login: '로그인',
+        goal_task: '작업 1개',
+        goal_focus: '1시간 집중',
     },
     settings: {
         ...en.settings,
@@ -579,7 +619,12 @@ const ru: typeof en = {
             'Аспирант 2', 'Аспирант 3', 'Доктор', 'Доцент', 'Профессор'
         ],
         streakDetail: 'День {n}, +{e} EXP', companion: 'Питомец', petName: 'Фокус Лис', streakTitle: 'Серия', todaysVibe: "Настрой",
-        avgScore: 'Ср. балл', weeklyActivity: 'Активность', last7Days: '7 дней'
+        avgScore: 'Ср. балл', weeklyActivity: 'Активность', last7Days: '7 дней',
+        // NEW
+        dailyGoalsTitle: 'Цели',
+        goal_login: 'Вход',
+        goal_task: '1 Задача',
+        goal_focus: '1 час',
     },
     settings: {
         ...en.settings,
@@ -629,7 +674,12 @@ const ar: typeof en = {
             'دكتوراه 2', 'دكتوراه 3', 'ما بعد الدكتوراه', 'أستاذ مساعد', 'أستاذ'
         ],
         streakDetail: 'يوم {n}, +{e} خبرة', companion: 'الرفيق', petName: 'ثعلب التركيز', streakTitle: 'التتابع', todaysVibe: "مزاج اليوم",
-        avgScore: 'متوسط النقاط', weeklyActivity: 'النشاط الأسبوعي', last7Days: 'آخر 7 أيام'
+        avgScore: 'متوسط النقاط', weeklyActivity: 'النشاط الأسبوعي', last7Days: 'آخر 7 أيام',
+        // NEW
+        dailyGoalsTitle: 'أهداف',
+        goal_login: 'دخول',
+        goal_task: 'مهمة واحدة',
+        goal_focus: 'ساعة تركيز',
     },
     settings: {
         ...en.settings,
@@ -679,7 +729,12 @@ const hi: typeof en = {
             'पीएचडी 2', 'पीएचडी 3', 'पोस्ट-डॉक', 'सहायक प्रोफेसर', 'प्रोफेसर'
         ],
         streakDetail: 'दिन {n}, +{e} EXP', companion: 'साथी', petName: 'फोकस फॉक्स', streakTitle: 'लगातार', todaysVibe: "आज का मूड",
-        avgScore: 'औसत स्कोर', weeklyActivity: 'साप्ताहिक गतिविधि', last7Days: 'पिछले 7 दिन'
+        avgScore: 'औसत स्कोर', weeklyActivity: 'साप्ताहिक गतिविधि', last7Days: 'पिछले 7 दिन',
+        // NEW
+        dailyGoalsTitle: 'लक्ष्य',
+        goal_login: 'लॉग इन करें',
+        goal_task: '1 कार्य',
+        goal_focus: '1 घंटा',
     },
     settings: {
         ...en.settings,

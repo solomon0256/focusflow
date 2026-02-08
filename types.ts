@@ -34,32 +34,45 @@ export type LanguageCode = 'en' | 'zh' | 'zh-TW' | 'fr' | 'ja' | 'ko' | 'es' | '
 
 export type SoundMode = 'timer' | 'always';
 
-export type ThemeMode = 'system' | 'light' | 'dark'; // New Theme Type
+export type ThemeMode = 'system' | 'light' | 'dark';
 
-export type TimeFormat = '12h' | '24h'; // New Time Format Type
+export type TimeFormat = '12h' | '24h';
 
 export interface Settings {
   workTime: number;
   shortBreakTime: number;
   longBreakTime: number;
   pomodorosPerRound: number;
-  notifications: number[]; // Used for POMODORO mode
-  customNotifications: number[]; // Used for CUSTOM mode
-  stopwatchNotifications: number[]; // Used for STOPWATCH mode
+  notifications: number[]; 
+  customNotifications: number[]; 
+  stopwatchNotifications: number[]; 
   language: LanguageCode;
-  batterySaverMode: boolean; // New Power Saver Toggle
-  
-  // --- THEME SETTINGS ---
+  batterySaverMode: boolean; 
   theme: ThemeMode;
-
-  // --- PREFERENCES ---
   timeFormat: TimeFormat;
-
-  // --- AUDIO SETTINGS ---
   soundEnabled: boolean;
   soundMode: SoundMode;
   selectedSoundId: string;
-  soundVolume: number; // 0.0 to 1.0
+  soundVolume: number; 
+}
+
+// --- NEW FOCUS METRICS ---
+
+export enum FocusLevel {
+  DISTRACTED = 'DISTRACTED', // 0
+  LOW_FOCUS = 'LOW_FOCUS',   // 1
+  FOCUSED = 'FOCUSED',       // 2
+  FLOW = 'FLOW'              // 3
+}
+
+export interface CycleRecord {
+  cycleIndex: number;         
+  phaseType: 'WORK';          
+  durationSec: number;        
+  cameraLevel: FocusLevel | null; 
+  selfLevel: FocusLevel | null;   
+  finalLevel: FocusLevel | null;  
+  createdAtMs: number;
 }
 
 export interface FocusRecord {
@@ -67,7 +80,8 @@ export interface FocusRecord {
     date: string; // YYYY-MM-DD
     durationMinutes: number;
     mode: TimerMode;
-    score?: number; // 0-100, Focus Quality Score
+    score?: number; 
+    cycles?: CycleRecord[]; // Added for detailed tracking
 }
 
 // --- PET SYSTEM TYPES ---
@@ -76,7 +90,7 @@ export interface PetState {
     currentExp: number;
     maxExp: number;
     happiness: number;
-    lastDailyActivityDate: string; // YYYY-MM-DD
+    lastDailyActivityDate: string; 
     streakCount: number;
 }
 
@@ -87,17 +101,16 @@ export interface User {
     avatar?: string;
     isPremium: boolean;
     planExpiry?: string;
-    pet: PetState; // Added Pet State
+    pet: PetState; 
 }
 
-// --- NEW SAAS TYPES ---
 export type PlanInterval = 'month' | 'year' | 'lifetime';
 
 export interface Product {
-    id: string;        // The ID used in Apple/Google stores (e.g., 'com.focusflow.monthly')
-    name: string;      // Display name (e.g., 'Monthly Pro')
-    price: string;     // Display price (e.g., '$2.99')
+    id: string;        
+    name: string;      
+    price: string;     
     interval: PlanInterval; 
     description: string;
-    tag?: string;      // Optional tag like "Best Value"
+    tag?: string;      
 }

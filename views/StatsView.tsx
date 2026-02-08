@@ -238,15 +238,16 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
 
   // NEW: Daily Goals Card Component
   const DailyGoalsCard = () => {
+      // Use localization keys for goals
       const goals = [
-          { label: "Daily Session (25m+)", done: stats.isLogged, icon: Flame, color: "text-orange-500" },
-          { label: "Complete 1 Task", done: stats.completedCount > 0, icon: CheckSquare, color: "text-blue-500" },
-          { label: "Focus 1 Hour", done: stats.totalMinutes >= 60, icon: Clock, color: "text-purple-500" }
+          { label: t.goal_login, done: stats.isLogged, icon: Flame, color: "text-orange-500" },
+          { label: t.goal_task, done: stats.completedCount > 0, icon: CheckSquare, color: "text-blue-500" },
+          { label: t.goal_focus, done: stats.totalMinutes >= 60, icon: Clock, color: "text-purple-500" }
       ];
 
       return (
           <IOSCard className="!mb-4 p-4 border border-gray-100 dark:border-gray-800 shadow-sm">
-              <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 px-1">Daily Goals</h3>
+              <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 px-1">{t.dailyGoalsTitle}</h3>
               <div className="space-y-3">
                   {goals.map((goal, i) => (
                       <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50">
