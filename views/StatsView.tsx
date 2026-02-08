@@ -1,8 +1,9 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, Cell, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IOSCard } from '../components/IOSComponents';
-import { Award, Zap, Clock, CheckCircle2, ChevronDown, ChevronUp, TrendingUp, Star, Trophy, Smile, Activity, Sparkles, Flame, Quote, Battery, Moon, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Award, Zap, Clock, CheckCircle2, ChevronDown, ChevronUp, TrendingUp, Star, Trophy, Smile, Activity, Sparkles, Flame, Quote, Battery, Moon, Loader2, Image as ImageIcon, Circle, CheckSquare } from 'lucide-react';
 import { Task, FocusRecord, Settings, User } from '../types';
 import { translations } from '../utils/translations';
 import { getDailyQuote } from '../utils/quotes';
@@ -129,7 +130,17 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
         else { tier = 1; moodLabel = t.mood_distracted; }
     }
 
-    return { focusHours: hours, completedCount: completedToday.length, studyExp: Math.floor(totalMinutes * 0.4), isLogged: user?.pet.lastDailyActivityDate === todayStr, avgScore, mood: moodLabel, tier, hasData: count > 0 };
+    return { 
+        focusHours: hours, 
+        totalMinutes: totalMinutes, // Added for Daily Goals Check
+        completedCount: completedToday.length, 
+        studyExp: Math.floor(totalMinutes * 0.4), 
+        isLogged: user?.pet.lastDailyActivityDate === todayStr, 
+        avgScore, 
+        mood: moodLabel, 
+        tier, 
+        hasData: count > 0 
+    };
   }, [tasks, focusHistory, user, t]);
 
   const chartData = useMemo(() => {
@@ -225,6 +236,40 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
     );
   };
 
+  // NEW: Daily Goals Card Component
+  const DailyGoalsCard = () => {
+      const goals = [
+          { label: "Daily Session (25m+)", done: stats.isLogged, icon: Flame, color: "text-orange-500" },
+          { label: "Complete 1 Task", done: stats.completedCount > 0, icon: CheckSquare, color: "text-blue-500" },
+          { label: "Focus 1 Hour", done: stats.totalMinutes >= 60, icon: Clock, color: "text-purple-500" }
+      ];
+
+      return (
+          <IOSCard className="!mb-4 p-4 border border-gray-100 dark:border-gray-800 shadow-sm">
+              <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 px-1">Daily Goals</h3>
+              <div className="space-y-3">
+                  {goals.map((goal, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50">
+                          <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-full ${goal.done ? 'bg-white dark:bg-gray-700 shadow-sm' : 'bg-gray-200 dark:bg-gray-700 opacity-50'}`}>
+                                  <goal.icon size={16} className={goal.done ? goal.color : 'text-gray-500'} />
+                              </div>
+                              <span className={`text-sm font-bold ${goal.done ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                                  {goal.label}
+                              </span>
+                          </div>
+                          {goal.done ? (
+                              <CheckCircle2 size={20} className="text-green-500 fill-green-100 dark:fill-green-900/30" />
+                          ) : (
+                              <Circle size={20} className="text-gray-300 dark:text-gray-600" />
+                          )}
+                      </div>
+                  ))}
+              </div>
+          </IOSCard>
+      );
+  };
+
   const VibeStatusCard = () => {
       const tiers = [
           { level: 1, label: t.mood_distracted, mul: 'x0.8', color: 'bg-red-50 dark:bg-red-900/30',     activeColor: 'bg-red-500',    emoji: '😴', border: 'border-red-200 dark:border-red-800' },
@@ -276,6 +321,7 @@ const StatsView: React.FC<StatsViewProps> = ({ tasks, focusHistory, settings, on
         <button className="bg-white dark:bg-gray-800 p-2 rounded-full shadow-sm text-gray-400 dark:text-gray-500"><TrendingUp size={20} /></button>
       </div>
       <PetCard />
+      <DailyGoalsCard />
       <VibeStatusCard />
       <IOSCard className="!mb-4 p-5 min-h-[350px]">
         <div className="flex justify-between items-center mb-6">

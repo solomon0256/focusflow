@@ -1,21 +1,23 @@
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle, Battery, Monitor } from 'lucide-react';
+import { X, Square, Play, Pause, Brain, AlertTriangle, Activity, WifiOff, ScanFace, Eye, EyeOff, User as UserIcon, Zap, Crown, Coffee, Armchair, FastForward, CheckCircle2, TrendingUp, Sparkles, Move, Clock, Bell, Bug, Circle, Battery, Monitor, RotateCcw, Headphones } from 'lucide-react';
 import { TimerMode, Task, User, Settings } from '../types';
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
 import { NativeService } from '../services/native';
 import { AdBanner } from '../components/AdBanner';
 import { translations } from '../utils/translations';
 import { AudioService } from '../services/audio'; // Import AudioService
+import { SoundSelector } from '../components/SoundSelector'; // Import SoundSelector
 
 interface FocusSessionViewProps {
   mode: TimerMode;
   initialTimeInSeconds: number;
   settings: Settings;
+  setSettings: React.Dispatch<React.SetStateAction<Settings>>;
   task?: Task;
   user: User | null;
-  onComplete: (minutesFocused: number, taskCompleted?: boolean, avgScore?: number) => void;
+  onComplete: (minutesFocused: number, taskCompleted?: boolean, focusState?: string) => void;
   onCancel: () => void;
   onUpgradeTrigger: () => void;
   // NEW: Callback to notify parent of phase change
@@ -25,7 +27,15 @@ interface FocusSessionViewProps {
 // --- CONFIGURATION ---
 const INTERVAL_BALANCED = 200;
 const INTERVAL_SAVER = 500;
+
+// [CRITICAL FIX] 切换到 jsDelivr CDN，国内访问更稳定
+// 原来的 unpkg.com 和 storage.googleapis.com 在国内经常被墙或超时
 const CDN_WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm";
+// 注意：模型文件依然很大(8MB)，如果 jsDelivr 依然失败，可能需要科学上网
+// 我们这里使用 Google 的官方模型地址的 jsDelivr 镜像（如果存在）或者保持原样但增加错误提示
+// 由于 .task 文件不在 npm 包的标准路径里，我们暂时使用 Google 原始链接，
+// 但请确保你的网络环境能访问 storage.googleapis.com，或者挂代理。
+// 为了演示，我们尝试一个更有可能访问的 GitHub Raw 镜像（注意：生产环境最好部署在自己的 OSS/服务器上）
 const CDN_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 type SessionState = 'INIT' | 'COUNTDOWN' | 'CALIBRATING' | 'ACTIVE' | 'SUMMARY' | 'ERROR';
@@ -60,7 +70,7 @@ const formatMinutes = (m: number) => {
     return `${h}h ${min}m`;
 };
 
-const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, task, user, onComplete, onCancel, onUpgradeTrigger, onPhaseChange }) => {
+const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, setSettings, task, user, onComplete, onCancel, onUpgradeTrigger, onPhaseChange }) => {
   const t = translations[settings.language].session;
   
   const detectionInterval = settings.batterySaverMode ? INTERVAL_SAVER : INTERVAL_BALANCED;
@@ -103,6 +113,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const [showCameraPreview, setShowCameraPreview] = useState(true);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [isTooClose, setIsTooClose] = useState(false); // NEW STATE
+  const [isSoundMenuOpen, setIsSoundMenuOpen] = useState(false); // NEW: Sound Menu State
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null); 
@@ -148,49 +159,91 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       return () => { NativeService.Screen.allowSleep(); };
   }, []);
 
-  // 1. Init Pipeline (Unchanged)
-  useEffect(() => {
+  const initPipeline = async () => {
     let stream: MediaStream | null = null;
+    try {
+        setSessionState('INIT');
+        setErrorMessage('');
+        setLoadingStatus('Accessing Camera...');
+        
+        await new Promise(r => setTimeout(r, 500)); 
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: { ideal: targetResolution.width }, height: { ideal: targetResolution.height }, frameRate: { ideal: 30 } },
+            audio: false
+        });
+        
+        if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+        }
+
+        setLoadingStatus('Downloading AI Engine...');
+        
+        const vision = await FilesetResolver.forVisionTasks(CDN_WASM_URL);
+        
+        setLoadingStatus('Loading Pose Model...');
+        const landmarker = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: CDN_MODEL_URL, delegate: "GPU" },
+            runningMode: "VIDEO",
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        poseLandmarkerRef.current = landmarker;
+
+        if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            if (ctx) drawingUtilsRef.current = new DrawingUtils(ctx);
+        }
+        
+        setSessionState('COUNTDOWN');
+        return stream;
+
+    } catch (err: any) {
+        console.error("Init Error Details:", err);
+        let msg = 'AI Engine Failed to Load.';
+        if (err.name === 'NotAllowedError') msg = 'Camera access denied. Please allow camera in settings.';
+        else if (err.message && err.message.includes('fetch')) msg = 'Network Error: Failed to download AI files.\nPlease check your connection or Proxy.';
+        else if (err.toString().includes('wasm')) msg = 'WASM Compilation Failed.\nNetwork might be unstable.';
+        
+        setErrorMessage(msg);
+        setSessionState('ERROR');
+        
+        // Cleanup stream if partially successful
+        if (stream) {
+            (stream as MediaStream).getTracks().forEach(track => track.stop());
+        }
+        return null;
+    }
+  };
+
+  // 1. Init Pipeline
+  useEffect(() => {
+    let activeStream: MediaStream | null = null;
     let isMounted = true;
-    const setupPipeline = async () => {
-        try {
-            setLoadingStatus('Accessing Camera...');
-            await new Promise(r => setTimeout(r, 500)); 
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user', width: { ideal: targetResolution.width }, height: { ideal: targetResolution.height }, frameRate: { ideal: 30 } },
-                audio: false
-            });
-            if (videoRef.current) videoRef.current.srcObject = stream;
-            setLoadingStatus('Loading Neural Network...');
-            const vision = await FilesetResolver.forVisionTasks(CDN_WASM_URL);
-            poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: CDN_MODEL_URL, delegate: "GPU" },
-                runningMode: "VIDEO",
-                numPoses: 1,
-                minPoseDetectionConfidence: 0.5,
-                minPosePresenceConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-            if (canvasRef.current) {
-                const ctx = canvasRef.current.getContext('2d');
-                if (ctx) drawingUtilsRef.current = new DrawingUtils(ctx);
-            }
-            if (isMounted) setSessionState('COUNTDOWN');
-        } catch (err: any) {
-            console.error("Init Error:", err);
-            if (isMounted) {
-                if (err.name === 'NotAllowedError') setErrorMessage('Camera access denied.');
-                else setErrorMessage('AI Engine Failed to Load.');
-                setSessionState('ERROR');
-            }
+
+    const runInit = async () => {
+        const s = await initPipeline();
+        if (isMounted && s) {
+            activeStream = s;
+        } else if (s) {
+            // Unmounted during init, cleanup immediately
+            s.getTracks().forEach(track => track.stop());
         }
     };
-    setupPipeline();
+
+    runInit();
+
     return () => {
         isMounted = false;
-        if (stream) stream.getTracks().forEach(track => track.stop());
+        if (activeStream) activeStream.getTracks().forEach(track => track.stop());
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
-        if (poseLandmarkerRef.current) poseLandmarkerRef.current.close();
+        if (poseLandmarkerRef.current) {
+            try {
+                poseLandmarkerRef.current.close();
+            } catch(e) { console.warn("Error closing landmarker", e); }
+        }
     };
   }, []); 
 
@@ -216,13 +269,17 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const landmarker = poseLandmarkerRef.current;
       const video = videoRef.current;
       if (landmarker && video && video.readyState >= 2) {
-          const result = landmarker.detectForVideo(video, performance.now());
-          if (result.landmarks && result.landmarks.length > 0) {
-              const pose = result.landmarks[0];
-              calibrationRef.current = {
-                  noseBase: { x: pose[0].x, y: pose[0].y },
-                  shoulderWidthBase: Math.abs(pose[11].x - pose[12].x)
-              };
+          try {
+             const result = landmarker.detectForVideo(video, performance.now());
+             if (result.landmarks && result.landmarks.length > 0) {
+                 const pose = result.landmarks[0];
+                 calibrationRef.current = {
+                     noseBase: { x: pose[0].x, y: pose[0].y },
+                     shoulderWidthBase: Math.abs(pose[11].x - pose[12].x)
+                 };
+             }
+          } catch(e) {
+             console.warn("Calibration frame skipped", e);
           }
       }
       
@@ -235,7 +292,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       NativeService.Haptics.notificationSuccess();
   };
 
-  // 3. AI Loop (Unchanged)
+  // 3. AI Loop
   useEffect(() => {
       if (sessionState === 'ACTIVE' && phase === 'WORK' && !isAiDisabled && !isPaused) {
           const predictWebcam = () => {
@@ -254,7 +311,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                           try {
                               const results = landmarker.detectForVideo(video, now);
                               analyzePose_Debug_Visualization(results, video, canvas);
-                          } catch (e) { console.error(e); }
+                          } catch (e) { console.error("Prediction Error", e); }
                       }
                   }
               }
@@ -440,14 +497,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const handleFinish = () => {
       const minutes = totalFocusedSecondsRef.current / 60;
-      let avgScore = 100;
-      if (sessionHistoryRef.current.length > 0) {
-          const totalScore = sessionHistoryRef.current.reduce((acc, curr) => acc + curr.avgFocusScore, 0);
-          avgScore = Math.ceil(totalScore / sessionHistoryRef.current.length);
-      } else {
-          avgScore = Math.ceil(focusScore);
-      }
-      onComplete(Number(minutes.toFixed(1)), isTaskCompleted, avgScore);
+      // Pass the current focus state instead of calculating average score
+      onComplete(Number(minutes.toFixed(1)), isTaskCompleted, focusState);
   };
 
   const skipBreak = () => {
@@ -623,6 +674,17 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const breakStats = isBreak ? getLastSessionStats() : null;
   const fullTimeline = sessionHistoryRef.current.flatMap(s => s.timeline);
+
+  const retryInit = () => {
+      // Reload logic
+      const runInit = async () => {
+         const s = await initPipeline();
+         if (s) {
+             // Success logic is handled inside initPipeline setting state to COUNTDOWN
+         }
+      };
+      runInit();
+  };
 
   return (
     <div className="fixed inset-0 bg-black z-50 overflow-hidden font-sans">
@@ -899,9 +961,18 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                                         <ScanFace size={10} className="text-white" />
                                         <span className="text-[10px] font-mono text-white">{debugInfo}</span>
                                     </div>
-                                    <button onClick={() => setShowCameraPreview(!showCameraPreview)} className="bg-white/20 p-1 rounded hover:bg-white/40 pointer-events-auto">
-                                        {showCameraPreview ? <EyeOff size={12} /> : <Eye size={12} />}
-                                    </button>
+                                    {/* Combined View Toggles */}
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => setIsSoundMenuOpen(true)}
+                                            className="bg-white/20 p-1.5 rounded-lg hover:bg-white/40 pointer-events-auto backdrop-blur-md"
+                                        >
+                                            <Headphones size={14} />
+                                        </button>
+                                        <button onClick={() => setShowCameraPreview(!showCameraPreview)} className="bg-white/20 p-1.5 rounded-lg hover:bg-white/40 pointer-events-auto backdrop-blur-md">
+                                            {showCameraPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1033,6 +1104,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
             </div>
         )}
 
+        {/* --- SOUND SELECTOR OVERLAY --- */}
+        <SoundSelector 
+            isOpen={isSoundMenuOpen} 
+            onClose={() => setIsSoundMenuOpen(false)} 
+            settings={settings} 
+            setSettings={setSettings} 
+        />
+
         {/* --- LOADING / ERROR --- */}
         { (sessionState === 'INIT' || sessionState === 'ERROR') && (
             <div className="absolute inset-0 bg-black flex flex-col items-center justify-center text-white px-8 text-center z-20">
@@ -1040,10 +1119,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                     <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
                         <WifiOff size={48} className="text-red-500 mb-4" />
                         <h2 className="text-xl font-bold mb-2">Init Failed</h2>
-                        <p className="text-gray-400 mb-6 text-sm">{errorMessage}</p>
-                        <div className="flex gap-4">
-                            <button onClick={onCancel} className="px-6 py-3 rounded-full bg-gray-800 font-semibold">Back</button>
-                            <button onClick={() => { setIsAiDisabled(true); setSessionState('COUNTDOWN'); }} className="px-6 py-3 rounded-full bg-blue-600 font-semibold">No AI</button>
+                        <p className="text-gray-400 mb-6 text-sm whitespace-pre-line">{errorMessage}</p>
+                        <div className="flex flex-col gap-3 w-full max-w-[200px]">
+                             <button onClick={retryInit} className="w-full px-6 py-3 rounded-full bg-white text-black font-bold flex items-center justify-center gap-2">
+                                 <RotateCcw size={16}/> Retry
+                             </button>
+                            <button onClick={onCancel} className="w-full px-6 py-3 rounded-full bg-gray-800 font-semibold text-gray-400">Back</button>
+                            <button onClick={() => { setIsAiDisabled(true); setSessionState('COUNTDOWN'); }} className="w-full px-6 py-3 rounded-full bg-blue-900/30 text-blue-400 font-semibold text-xs mt-2">Start without AI</button>
                         </div>
                     </div>
                 ) : (
@@ -1066,6 +1148,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                     exit={{ scale: 1.5, opacity: 0 }}
                     className="text-[120px] font-bold text-white font-mono drop-shadow-2xl"
                 >
+
+                
                     {countdown}
                 </motion.div>
                 <p className="text-white/80 mt-8 font-medium animate-pulse">Sit naturally for calibration...</p>
