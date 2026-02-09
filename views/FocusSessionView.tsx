@@ -17,7 +17,7 @@ interface FocusSessionViewProps {
   setSettings: React.Dispatch<React.SetStateAction<Settings>>;
   task?: Task;
   user: User | null;
-  onComplete: (minutesFocused: number, taskCompleted?: boolean, focusState?: string) => void;
+  onComplete: (minutesFocused: number, taskCompleted?: boolean, focusLevel?: FocusLevel | null) => void;
   onCancel: () => void;
   onUpgradeTrigger: () => void;
   onPhaseChange?: (phase: 'IDLE' | 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK') => void;
@@ -495,7 +495,23 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   const handleFinish = () => {
       const minutes = totalFocusedSecondsRef.current / 60;
-      onComplete(Number(minutes.toFixed(1)), isTaskCompleted, focusState);
+      let finalLevel: FocusLevel | null = null;
+
+      // Strict Logic for Session Final Level
+      if (totalFocusedSecondsRef.current >= 60) {
+          if (cycleRecordsRef.current.length > 0) {
+              // Rule: Session Final Level = last(cycleRecordsRef).finalLevel
+              finalLevel = cycleRecordsRef.current[cycleRecordsRef.current.length - 1].finalLevel;
+          } else {
+              // Rule: No records (even if duration > 60s, maybe cycle didn't finish or commit) -> null
+              finalLevel = null;
+          }
+      } else {
+          // Rule: Short session (< 60s) -> null
+          finalLevel = null;
+      }
+
+      onComplete(Number(minutes.toFixed(1)), isTaskCompleted, finalLevel);
   };
 
   const skipBreak = () => {

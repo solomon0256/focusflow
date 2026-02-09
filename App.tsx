@@ -6,7 +6,7 @@ import TasksView from './views/TasksView';
 import StatsView from './views/StatsView';
 import SettingsView from './views/SettingsView';
 import FocusSessionView from './views/FocusSessionView';
-import { Task, Settings, Priority, FocusRecord, TimerMode, User, LanguageCode } from './types';
+import { Task, Settings, Priority, FocusRecord, TimerMode, User, LanguageCode, FocusLevel } from './types';
 import { NativeService } from './services/native';
 import { AudioService } from './services/audio';
 import { Zap } from 'lucide-react';
@@ -142,17 +142,18 @@ function App() {
     return () => window.removeEventListener('click', onUserInteraction);
   }, [onUserInteraction]);
 
-  const handleSessionComplete = (minutes: number, taskCompleted: boolean = false, focusState: string = 'FOCUSED') => {
+  const handleSessionComplete = (minutes: number, taskCompleted: boolean = false, focusLevel: FocusLevel | null = null) => {
       if (currentSessionParams) {
           // 1. Add History Record
-          // Score is approximate based on state for backward compatibility. 
-          // FUTURE: Remove this once StatsView uses real state enums.
-          let approximateScore = 80;
-          if (focusState === 'DEEP_FLOW') approximateScore = 100;
-          else if (focusState === 'FOCUSED') approximateScore = 85;
-          else if (focusState === 'DISTRACTED') approximateScore = 50;
+          // Strict score mapping from FocusLevel enum
+          let score = 0;
+          if (focusLevel === FocusLevel.FLOW) score = 100;
+          else if (focusLevel === FocusLevel.FOCUSED) score = 85;
+          else if (focusLevel === FocusLevel.LOW_FOCUS) score = 60;
+          else if (focusLevel === FocusLevel.DISTRACTED) score = 40;
+          else score = 0; // null case (ABSENT or skipped)
           
-          const newRecord: FocusRecord = { id: Date.now().toString(), date: getLocalDateString(), durationMinutes: minutes, mode: currentSessionParams.mode, score: approximateScore };
+          const newRecord: FocusRecord = { id: Date.now().toString(), date: getLocalDateString(), durationMinutes: minutes, mode: currentSessionParams.mode, score: score };
           setFocusHistory(prev => [...prev, newRecord]);
           
           // 2. Mark Task as Complete
@@ -189,8 +190,6 @@ function App() {
                       newStreak = Math.min(7, currentStreak + 1);
                   } else {
                       // Missed days (> 1 day gap)
-                      // We need to calculate how many days were missed for the penalty
-                      // Parse YYYY-MM-DD to local midnight to avoid timezone errors
                       const parseDate = (str: string) => {
                           if (!str) return new Date(0);
                           const [y, m, d] = str.split('-').map(Number);
@@ -203,8 +202,6 @@ function App() {
                       const diffTime = dToday.getTime() - dLast.getTime();
                       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); // Days elapsed
 
-                      // Missed days = diffDays - 1 (e.g., if diff is 2 days [Day 1 -> Day 3], missed Day 2, so 1 day missed)
-                      // If diffDays is huge (new user or long absence), this math holds.
                       const missedDays = Math.max(0, diffDays - 1);
                       
                       if (missedDays > 0) {
@@ -228,18 +225,13 @@ function App() {
                   updatedLastActive = todayStr;
               }
 
-              // --- BASE EXP & MULTIPLIER (Whitelist) ---
-              let multiplier = 1.0;
-              switch (focusState) {
-                  case 'DEEP_FLOW': multiplier = 1.5; break;
-                  case 'FOCUSED': multiplier = 1.2; break;
-                  case 'DISTRACTED': multiplier = 0.8; break;
-                  case 'ABSENT': multiplier = 1.0; break;
-                  default: 
-                      console.warn(`[App] Unknown focusState: ${focusState}. Defaulting to 1.0`);
-                      multiplier = 1.0; 
-                      break;
-              }
+              // --- BASE EXP & MULTIPLIER (Strict Enum Mapping) ---
+              let multiplier = 0;
+              if (focusLevel === FocusLevel.FLOW) multiplier = 1.5;
+              else if (focusLevel === FocusLevel.FOCUSED) multiplier = 1.2;
+              else if (focusLevel === FocusLevel.LOW_FOCUS) multiplier = 1.0;
+              else if (focusLevel === FocusLevel.DISTRACTED) multiplier = 0.8;
+              else multiplier = 0; // null case (no valid focus)
 
               // Integer Math Rule: Math.floor at every step
               const baseExp = Math.floor(minutes * multiplier);
