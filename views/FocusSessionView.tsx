@@ -74,7 +74,7 @@ const getBaseScore = (state: InternalMinuteState): number => {
 const getAnomalyWeight = (state: InternalMinuteState): number => {
     if (state === FocusLevel.DISTRACTED) return 1.0;
     if (state === FocusLevel.LOW_FOCUS) return 0.5;
-    if (state === 'ABSENT') return 1.2; // Adjusted from 1.5 to 1.2 based on audit
+    if (state === 'ABSENT') return 1.5; // Adjusted to 1.5 for stricter penalty
     return 0; // FLOW / FOCUSED
 };
 
@@ -346,15 +346,19 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   // --- MINUTE AGGREGATION ---
   const finalizeMinute = (minuteIndex: number, isFinal: boolean = false) => {
-      // Guard: Prevent double logging unless forced at end of session
-      if (!isFinal && minuteIndex <= lastLoggedMinute.current) return;
+      // Guard: Never allow duplicate push for the same minute.
+      // If isFinal=true, only allow when there is unflushed data.
+      if (minuteIndex <= lastLoggedMinute.current) {
+          if (!isFinal) return;
+          if (currentMinuteFrameCount.current === 0) return;
+      }
 
       let minuteState: InternalMinuteState;
       
       // Dynamic Threshold: 10% of expected frames
-      // FIX: Ensure FPS is at least 1 to avoid Division By Zero or Zero Threshold
-      const currentFPS = Math.max(fpsRef.current || (settings.batterySaverMode ? 2 : 5), 1);
-      const minFrames = currentFPS * 60 * 0.1;
+      // FIX: use expected FPS instead of unstable realtime FPS
+      const expectedFPS = settings.batterySaverMode ? 2 : 5;
+      const minFrames = expectedFPS * 60 * 0.1;
 
       // Validity check: Not enough frames -> ABSENT
       if (currentMinuteFrameCount.current === 0 || currentMinuteFrameCount.current < minFrames) {
@@ -452,8 +456,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                   currentCycleElapsedRef.current++;
                   
                   // Stopwatch minute logging (using while to catch up if needed)
-                  const currentMinuteIndex = Math.floor(currentCycleElapsedRef.current / 60);
-                  while (currentMinuteIndex > lastLoggedMinute.current) {
+                  const elapsed = currentCycleElapsedRef.current;
+                  const completedMinuteIndex = Math.floor((elapsed - 1) / 60);
+                  while (completedMinuteIndex > lastLoggedMinute.current) {
                       finalizeMinute(lastLoggedMinute.current + 1);
                   }
               }
@@ -471,8 +476,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               const elapsedSeconds = totalFocusedSecondsRef.current;
               
               // Minute Boundary Check - FIX: Use while loop to catch up missed minutes
-              const currentMinuteIndex = Math.floor(currentCycleElapsedRef.current / 60);
-              while (currentMinuteIndex > lastLoggedMinute.current) {
+              const elapsed = currentCycleElapsedRef.current;
+              const completedMinuteIndex = Math.floor((elapsed - 1) / 60);
+              while (completedMinuteIndex > lastLoggedMinute.current) {
                   finalizeMinute(lastLoggedMinute.current + 1);
               }
 
@@ -517,11 +523,11 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   // Moves state to Break
   const triggerPhaseSwitch = () => {
       // 1. Force finalize current minute correctly
-      const finalMinuteIndex = Math.floor(currentCycleElapsedRef.current / 60);
-      
-      // If we have pending frames in the current partially finished minute, finalize it.
-      // We pass 'true' to force finalization even if index might clash with guard (though it shouldn't if logic is correct)
-      if (currentMinuteFrameCount.current > 0) {
+      const elapsed = currentCycleElapsedRef.current;
+      const finalMinuteIndex = Math.floor((elapsed - 1) / 60);
+
+      // 只在“还有未结算数据”或“确实跨过了新分钟”时，才强制结算最后一分钟，避免重复 push
+      if (finalMinuteIndex > lastLoggedMinute.current || currentMinuteFrameCount.current > 0) {
           finalizeMinute(finalMinuteIndex, true);
       }
 
@@ -766,7 +772,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       }
 
       // --- PENALTY ACCUMULATION ---
-      if (!isPaused) {
+      // FIX: Only accumulate during ACTIVE WORK phase
+      if (
+          !isPaused &&
+          sessionState === 'ACTIVE' &&
+          phase === 'WORK'
+      ) {
           const penalty = getFramePenalty(newState);
           currentMinutePenaltySum.current += penalty;
           currentMinuteFrameCount.current += 1;
