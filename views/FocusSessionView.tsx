@@ -30,6 +30,7 @@ const CDN_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_land
 
 type SessionState = 'INIT' | 'COUNTDOWN' | 'CALIBRATING' | 'ACTIVE' | 'SUMMARY' | 'ERROR';
 type Phase = 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK';
+type InternalMinuteState = FocusLevel | 'ABSENT';
 
 // Helper to format minutes
 const formatMinutes = (m: number) => {
@@ -42,7 +43,60 @@ const formatMinutes = (m: number) => {
     return `${h}h ${min}m`;
 };
 
-// --- LOGIC HELPERS ---
+// --- ALGORITHM HELPERS ---
+
+const getFramePenalty = (state: 'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'): number => {
+    switch (state) {
+        case 'DEEP_FLOW': return 0;
+        case 'FOCUSED': return 1;
+        case 'DISTRACTED': return 6;
+        case 'ABSENT': return 10;
+        default: return 10;
+    }
+};
+
+const mapPenaltyToMinuteState = (avgPenalty: number): InternalMinuteState => {
+    if (avgPenalty < 0.5) return FocusLevel.FLOW;
+    if (avgPenalty < 1.5) return FocusLevel.FOCUSED;
+    if (avgPenalty < 3.5) return FocusLevel.LOW_FOCUS;
+    return FocusLevel.DISTRACTED;
+};
+
+// Cycle Aggregation Step A: Base Score
+const getBaseScore = (state: InternalMinuteState): number => {
+    if (state === FocusLevel.FLOW) return 3;
+    if (state === FocusLevel.FOCUSED) return 2;
+    if (state === FocusLevel.LOW_FOCUS) return 1;
+    return 0; // DISTRACTED or ABSENT
+};
+
+// Cycle Aggregation Step B: Anomaly Weight
+const getAnomalyWeight = (state: InternalMinuteState): number => {
+    if (state === FocusLevel.DISTRACTED) return 1.0;
+    if (state === FocusLevel.LOW_FOCUS) return 0.5;
+    if (state === 'ABSENT') return 1.2; // Adjusted from 1.5 to 1.2 based on audit
+    return 0; // FLOW / FOCUSED
+};
+
+const getBaseLevelFromAvg = (avg: number): FocusLevel => {
+    if (avg >= 2.6) return FocusLevel.FLOW;
+    if (avg >= 1.8) return FocusLevel.FOCUSED;
+    if (avg >= 1.0) return FocusLevel.LOW_FOCUS;
+    return FocusLevel.DISTRACTED;
+};
+
+const downgradeOneLevel = (l: FocusLevel): FocusLevel => {
+    if (l === FocusLevel.FLOW) return FocusLevel.FOCUSED;
+    if (l === FocusLevel.FOCUSED) return FocusLevel.LOW_FOCUS;
+    return FocusLevel.DISTRACTED;
+};
+
+const capLevel = (l: FocusLevel, cap: FocusLevel): FocusLevel => {
+    const rank = { [FocusLevel.FLOW]: 3, [FocusLevel.FOCUSED]: 2, [FocusLevel.LOW_FOCUS]: 1, [FocusLevel.DISTRACTED]: 0 };
+    return rank[l] <= rank[cap] ? l : cap;
+};
+
+// --- FUSION HELPER ---
 
 const levelToNumber = (l: FocusLevel): number => {
     switch (l) {
@@ -61,36 +115,21 @@ const numberToLevel = (n: number): FocusLevel => {
     return FocusLevel.DISTRACTED;
 };
 
-// Strict Rule Implementation
+// Strict Rule Implementation for Fusion
 const calculateFinalLevel = (camera: FocusLevel | null, self: FocusLevel | null): FocusLevel | null => {
-    // Case C: Both null
     if (camera === null && self === null) return null;
-
-    // Case A: Camera valid, Self null
     if (camera !== null && self === null) return camera;
-
-    // Case B: Camera null, Self valid (Treat Absent as null for calc)
     if (camera === null && self !== null) return self;
 
-    // Both valid - Fusion Logic
-    // We force cast here because we checked for nulls above
     const c = levelToNumber(camera!);
     const s = levelToNumber(self!);
     const gap = Math.abs(c - s);
 
     if (gap < 2) {
-        // Case D: Gap < 2 (Not significant)
-        // Rule: Camera >= Self -> Final = Camera
         if (c >= s) return camera;
-        // Rule: Camera < Self -> Final = max(camera, self - 1)
         return numberToLevel(Math.max(c, s - 1));
     } else {
-        // Case E: Gap >= 2 (Significant difference)
-        
-        // E1: Self High, Camera Low (s > c) -> Trust Camera
         if (s > c) return camera;
-        
-        // E2: Self Low, Camera High (c > s) -> Trust Self (User Correction)
         return self;
     }
 };
@@ -109,6 +148,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const [isRatingPending, setIsRatingPending] = useState(false);
   const cycleRecordsRef = useRef<CycleRecord[]>([]);
   const pendingCycleRef = useRef<Partial<CycleRecord> | null>(null);
+
+  // --- AGGREGATION STATE ---
+  const currentMinutePenaltySum = useRef(0);
+  const currentMinuteFrameCount = useRef(0);
+  const lastLoggedMinute = useRef(-1);
+  const cycleMinuteHistory = useRef<InternalMinuteState[]>([]);
 
   // Sync phase to parent
   useEffect(() => {
@@ -286,6 +331,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           } catch(e) {}
       }
       
+      // Reset Algorithm State (Valid for all modes including Stopwatch)
+      lastLoggedMinute.current = -1;
+      currentMinutePenaltySum.current = 0;
+      currentMinuteFrameCount.current = 0;
+      cycleMinuteHistory.current = [];
+
       const startDuration = initialTimeInSeconds;
       setTimeLeft(startDuration);
       sessionEndTimeRef.current = Date.now() + (startDuration * 1000);
@@ -293,8 +344,73 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       NativeService.Haptics.notificationSuccess();
   };
 
+  // --- MINUTE AGGREGATION ---
+  const finalizeMinute = (minuteIndex: number, isFinal: boolean = false) => {
+      // Guard: Prevent double logging unless forced at end of session
+      if (!isFinal && minuteIndex <= lastLoggedMinute.current) return;
+
+      let minuteState: InternalMinuteState;
+      
+      // Dynamic Threshold: 10% of expected frames
+      // FIX: Ensure FPS is at least 1 to avoid Division By Zero or Zero Threshold
+      const currentFPS = Math.max(fpsRef.current || (settings.batterySaverMode ? 2 : 5), 1);
+      const minFrames = currentFPS * 60 * 0.1;
+
+      // Validity check: Not enough frames -> ABSENT
+      if (currentMinuteFrameCount.current === 0 || currentMinuteFrameCount.current < minFrames) {
+          minuteState = 'ABSENT';
+      } else {
+          const avgPenalty = currentMinutePenaltySum.current / currentMinuteFrameCount.current;
+          minuteState = mapPenaltyToMinuteState(avgPenalty);
+      }
+
+      cycleMinuteHistory.current.push(minuteState);
+      
+      // FIX: Capture count for logging BEFORE reset
+      const capturedCount = currentMinuteFrameCount.current;
+
+      // Reset for next minute
+      currentMinutePenaltySum.current = 0;
+      currentMinuteFrameCount.current = 0;
+      lastLoggedMinute.current = minuteIndex;
+      
+      console.log(`[Algorithm] Minute ${minuteIndex} finalized: ${minuteState} (Frames: ${capturedCount}, Min: ${minFrames.toFixed(1)})`);
+  };
+
+  // --- CYCLE AGGREGATION ---
+  const calculateCycleCameraLevel = (): FocusLevel | null => {
+      const history = cycleMinuteHistory.current;
+      const N = history.length;
+      
+      if (N === 0) return null;
+
+      // Step A: Base Score
+      const totalBaseScore = history.reduce((acc, s) => acc + getBaseScore(s), 0);
+      const avgBaseScore = totalBaseScore / N;
+      const baseLevel = getBaseLevelFromAvg(avgBaseScore);
+
+      // Step B: Anomaly Ratio
+      const totalAnomalyWeight = history.reduce((acc, s) => acc + getAnomalyWeight(s), 0);
+      const r = totalAnomalyWeight / N;
+
+      // Step C: Thresholds
+      const softThreshold = Math.max(0.10, 1 / N);
+      const hardThreshold = Math.max(0.18, 2 / N);
+
+      // Step D: Penalty Application
+      let finalLevel = baseLevel;
+      if (r >= hardThreshold) {
+          finalLevel = capLevel(baseLevel, FocusLevel.LOW_FOCUS);
+      } else if (r >= softThreshold) {
+          finalLevel = downgradeOneLevel(baseLevel);
+      }
+
+      console.log(`[Algorithm] Cycle Result: N=${N}, Base=${baseLevel}, r=${r.toFixed(2)}, Final=${finalLevel}`);
+      return finalLevel;
+  };
+
   useEffect(() => {
-      if (sessionState === 'ACTIVE' && phase === 'WORK' && !isAiDisabled && !isPaused) {
+      if (sessionState === 'ACTIVE' && phase === 'WORK' && !isAiDisabled) {
           const predictWebcam = () => {
               const video = videoRef.current;
               const landmarker = poseLandmarkerRef.current;
@@ -322,7 +438,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       return () => cancelAnimationFrame(requestRef.current);
   }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase, detectionInterval]); 
 
-  // --- TIMER LOGIC (MODIFIED FOR NON-BLOCKING ASSESSMENT) ---
+  // --- TIMER LOGIC (MODIFIED FOR MINUTE AGGREGATION) ---
   useEffect(() => {
       if (sessionState !== 'ACTIVE') return;
 
@@ -334,6 +450,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               if (phase === 'WORK') {
                   totalFocusedSecondsRef.current++;
                   currentCycleElapsedRef.current++;
+                  
+                  // Stopwatch minute logging (using while to catch up if needed)
+                  const currentMinuteIndex = Math.floor(currentCycleElapsedRef.current / 60);
+                  while (currentMinuteIndex > lastLoggedMinute.current) {
+                      finalizeMinute(lastLoggedMinute.current + 1);
+                  }
               }
               return;
           }
@@ -347,6 +469,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               currentCycleElapsedRef.current++;
               
               const elapsedSeconds = totalFocusedSecondsRef.current;
+              
+              // Minute Boundary Check - FIX: Use while loop to catch up missed minutes
+              const currentMinuteIndex = Math.floor(currentCycleElapsedRef.current / 60);
+              while (currentMinuteIndex > lastLoggedMinute.current) {
+                  finalizeMinute(lastLoggedMinute.current + 1);
+              }
+
               if (elapsedSeconds % 60 === 0) {
                   const elapsedMinutes = elapsedSeconds / 60;
                   if (activeNotifications.includes(elapsedMinutes)) {
@@ -361,38 +490,11 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               setTimeLeft(0);
               
               if (phase === 'WORK') {
-                  // === WORK ENDED: PREPARE ASSESSMENT BUT DON'T BLOCK ===
-                  
-                  // 1. Minimum Threshold Check (60s) for recording
-                  if (currentCycleElapsedRef.current >= 60) {
-                        // 2. Prepare Pending Data
-                        let currentCamLevel: FocusLevel | null = null;
-                        if (isAiDisabled) currentCamLevel = null;
-                        else if (focusState === 'ABSENT') currentCamLevel = null;
-                        else if (focusState === 'DEEP_FLOW') currentCamLevel = FocusLevel.FLOW;
-                        else if (focusState === 'DISTRACTED') currentCamLevel = FocusLevel.DISTRACTED;
-                        else currentCamLevel = FocusLevel.FOCUSED; 
-
-                        pendingCycleRef.current = {
-                            durationSec: currentCycleElapsedRef.current,
-                            cameraLevel: currentCamLevel,
-                            phaseType: 'WORK',
-                            createdAtMs: Date.now()
-                        };
-                        
-                        // Enable rating UI in Break Layer
-                        setIsRatingPending(true);
-                  } else {
-                      // Cycle too short, just discard
-                      setIsRatingPending(false);
-                  }
-
-                  // 3. Immediately switch to break
+                  // === WORK ENDED ===
                   triggerPhaseSwitch();
               } 
               else if (phase === 'SHORT_BREAK' || phase === 'LONG_BREAK') {
                   // === BREAK ENDED ===
-                  // If rating was still pending (user ignored it), auto-commit as Skip (null)
                   if (isRatingPending) {
                       commitCycleRecord(null);
                   }
@@ -401,7 +503,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                       clearInterval(interval);
                       handleShowSummary(true); 
                   } else {
-                      // Automatically start next work session
                       startNextWorkSession();
                   }
               }
@@ -415,6 +516,39 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   // Moves state to Break
   const triggerPhaseSwitch = () => {
+      // 1. Force finalize current minute correctly
+      const finalMinuteIndex = Math.floor(currentCycleElapsedRef.current / 60);
+      
+      // If we have pending frames in the current partially finished minute, finalize it.
+      // We pass 'true' to force finalization even if index might clash with guard (though it shouldn't if logic is correct)
+      if (currentMinuteFrameCount.current > 0) {
+          finalizeMinute(finalMinuteIndex, true);
+      }
+
+      // 2. Run Cycle Aggregation
+      // Minimum Threshold Check (60s) for recording
+      if (currentCycleElapsedRef.current >= 60) {
+            let currentCamLevel: FocusLevel | null = null;
+            if (isAiDisabled) {
+                currentCamLevel = null;
+            } else {
+                currentCamLevel = calculateCycleCameraLevel();
+                // Map ABSENT/Null logic if needed, but calculateCycleCameraLevel handles logic
+            }
+
+            pendingCycleRef.current = {
+                durationSec: currentCycleElapsedRef.current,
+                cameraLevel: currentCamLevel,
+                phaseType: 'WORK',
+                createdAtMs: Date.now()
+            };
+            
+            // Enable rating UI in Break Layer
+            setIsRatingPending(true);
+      } else {
+          setIsRatingPending(false);
+      }
+
       const newRounds = roundsCompleted + 1;
       setRoundsCompleted(newRounds);
       NativeService.Haptics.notificationSuccess();
@@ -461,6 +595,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       NativeService.Haptics.notificationSuccess();
       setPhase('WORK');
       currentCycleElapsedRef.current = 0;
+      
+      // Reset Aggregation Refs
+      lastLoggedMinute.current = -1;
+      currentMinutePenaltySum.current = 0;
+      currentMinuteFrameCount.current = 0;
+      cycleMinuteHistory.current = [];
+
       const workSec = settings.workTime * 60;
       setTimeLeft(workSec);
       sessionEndTimeRef.current = Date.now() + (workSec * 1000);
@@ -622,6 +763,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           ctx.fillStyle = "red";
           ctx.font = "14px monospace";
           ctx.fillText("NO POSE DETECTED", 20, 70);
+      }
+
+      // --- PENALTY ACCUMULATION ---
+      if (!isPaused) {
+          const penalty = getFramePenalty(newState);
+          currentMinutePenaltySum.current += penalty;
+          currentMinuteFrameCount.current += 1;
       }
   };
 
