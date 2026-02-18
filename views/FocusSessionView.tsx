@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Square, Play, Pause, Brain, AlertTriangle, Move, Eye, EyeOff, User as UserIcon, Coffee, Armchair, FastForward, CheckCircle2, Sparkles, Bell, Bug, Battery, Monitor, RotateCcw, Headphones, BarChart2, Star, X } from 'lucide-react';
@@ -9,6 +8,58 @@ import { AdBanner } from '../components/AdBanner';
 import { translations } from '../utils/translations';
 import { AudioService } from '../services/audio'; 
 import { SoundSelector } from '../components/SoundSelector'; 
+
+// ==============================
+// FOCUS DETECTION CORE CONFIG
+// ==============================
+
+// -------- HEAD ROTATION THRESHOLDS (degrees) --------
+// 轻度偏转：开始认为注意力下降
+const HEAD_YAW_MILD = 20;
+// 明确分心：强惩罚区
+const HEAD_YAW_DISTRACT = 40;
+// 极端分心：几乎完全离开工作区域
+const HEAD_YAW_SEVERE = 60;
+
+// -------- HEAD ROTATION CHANGE THRESHOLD (degrees per frame) --------
+// 每帧变化超过该值，认为是“频繁扭头”
+const HEAD_YAW_DELTA_THRESHOLD = 12;
+
+// -------- HEAD POSITION OFFSET THRESHOLD (normalized screen ratio) --------
+// 鼻子相对校准中心偏移比例 (Static Position)
+const HEAD_OFFSET_MILD = 0.08;
+const HEAD_OFFSET_DISTRACT = 0.18;
+const HEAD_OFFSET_SEVERE = 0.28;
+
+// -------- HEAD MOVEMENT THRESHOLD (normalized distance delta) --------
+// 头部每帧移动距离 (Dynamic Movement)
+const HEAD_MOVE_MILD = 0.02;
+const HEAD_MOVE_DISTRACT = 0.05;
+const HEAD_MOVE_SEVERE = 0.08;
+
+// -------- BODY MOTION THRESHOLD --------
+// 肩部中心位移（normalized）
+const BODY_MOTION_MILD = 0.015;
+const BODY_MOTION_DISTRACT = 0.035;
+const BODY_MOTION_SEVERE = 0.060;
+
+// -------- ABSENT THRESHOLD --------
+// 连续无检测帧比例
+const ABSENT_RATIO_DISTRACT = 0.25;
+
+// -------- WEIGHTS (USER DEFINED) --------
+// 权重总和必须 = 1.0
+// 1. 身体偏移 (Body Motion): 0.4
+const WEIGHT_BODY_MOTION   = 0.40;
+// 2. 位置偏移 (Head Static Offset): 0.3
+const WEIGHT_HEAD_OFFSET   = 0.30;
+// 3. 头部移动 (Head Dynamic Move): 0.2
+const WEIGHT_HEAD_MOVE     = 0.20;
+// 4. 头部转动 (Head Rotation Yaw): 0.1
+const WEIGHT_HEAD_ROTATION = 0.10;
+
+// Absent 权重设为 0，因为 Absent 会直接强制分心，不再参与加权计算
+const WEIGHT_ABSENT        = 0.00;
 
 interface FocusSessionViewProps {
   mode: TimerMode;
@@ -41,25 +92,6 @@ const formatMinutes = (m: number) => {
     const min = totalMin % 60;
     if (min === 0) return `${h}h`;
     return `${h}h ${min}m`;
-};
-
-// --- ALGORITHM HELPERS ---
-
-const getFramePenalty = (state: 'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'): number => {
-    switch (state) {
-        case 'DEEP_FLOW': return 0;
-        case 'FOCUSED': return 1;
-        case 'DISTRACTED': return 6;
-        case 'ABSENT': return 10;
-        default: return 10;
-    }
-};
-
-const mapPenaltyToMinuteState = (avgPenalty: number): InternalMinuteState => {
-    if (avgPenalty < 0.5) return FocusLevel.FLOW;
-    if (avgPenalty < 1.5) return FocusLevel.FOCUSED;
-    if (avgPenalty < 3.5) return FocusLevel.LOW_FOCUS;
-    return FocusLevel.DISTRACTED;
 };
 
 // Cycle Aggregation Step A: Base Score
@@ -134,6 +166,32 @@ const calculateFinalLevel = (camera: FocusLevel | null, self: FocusLevel | null)
     }
 };
 
+// --- HELPER INTERFACES FOR NEW ALGO ---
+interface StructuredLandmark {
+    x: number;
+    y: number;
+    z?: number;
+}
+
+interface PrevLandmarks {
+    nose: StructuredLandmark;
+    leftShoulder: StructuredLandmark;
+    rightShoulder: StructuredLandmark;
+    yaw: number;
+    shoulderCenter: StructuredLandmark;
+}
+
+interface WindowFrameData {
+    score: number;
+    isAbsent: boolean;
+    timestamp: number;
+}
+
+interface WindowScore {
+    score: number;
+    absentRatio: number;
+}
+
 const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, setSettings, task, user, onComplete, onCancel, onUpgradeTrigger, onPhaseChange }) => {
   const t = translations[settings.language].session;
   
@@ -149,10 +207,18 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const cycleRecordsRef = useRef<CycleRecord[]>([]);
   const pendingCycleRef = useRef<Partial<CycleRecord> | null>(null);
 
-  // --- AGGREGATION STATE ---
-  const currentMinutePenaltySum = useRef(0);
-  const currentMinuteFrameCount = useRef(0);
-  const lastLoggedMinute = useRef(-1);
+  // --- NEW ALGORITHM STATE REFS ---
+  const prevLandmarksRef = useRef<PrevLandmarks | null>(null);
+  
+  // Window Aggregation Refs (10s)
+  const windowFrameScoresRef = useRef<WindowFrameData[]>([]);
+  const windowStartTimeRef = useRef<number>(0);
+  
+  // Minute Aggregation Refs (60s)
+  const minuteWindowScoresRef = useRef<WindowScore[]>([]);
+  const minuteStartTimeRef = useRef<number>(0);
+  
+  // Cycle History (Legacy Interface)
   const cycleMinuteHistory = useRef<InternalMinuteState[]>([]);
 
   // Sync phase to parent
@@ -331,11 +397,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           } catch(e) {}
       }
       
-      // Reset Algorithm State (Valid for all modes including Stopwatch)
-      lastLoggedMinute.current = -1;
-      currentMinutePenaltySum.current = 0;
-      currentMinuteFrameCount.current = 0;
+      // Reset Algorithm State
       cycleMinuteHistory.current = [];
+      prevLandmarksRef.current = null;
+      windowFrameScoresRef.current = [];
+      minuteWindowScoresRef.current = [];
+      windowStartTimeRef.current = Date.now();
+      minuteStartTimeRef.current = Date.now();
 
       const startDuration = initialTimeInSeconds;
       setTimeLeft(startDuration);
@@ -344,41 +412,108 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       NativeService.Haptics.notificationSuccess();
   };
 
-  // --- MINUTE AGGREGATION ---
-  const finalizeMinute = (minuteIndex: number, isFinal: boolean = false) => {
-      // Guard: Never allow duplicate push for the same minute.
-      // If isFinal=true, only allow when there is unflushed data.
-      if (minuteIndex <= lastLoggedMinute.current) {
-          if (!isFinal) return;
-          if (currentMinuteFrameCount.current === 0) return;
+  // --- NEW ALGORITHM: MAP SCORE TO LEVEL ---
+  const mapScoreToLevel = (score: number): FocusLevel => {
+      if (score >= 85) return FocusLevel.FLOW;
+      if (score >= 70) return FocusLevel.FOCUSED;
+      if (score >= 50) return FocusLevel.LOW_FOCUS;
+      return FocusLevel.DISTRACTED;
+  };
+
+  // --- NEW ALGORITHM: MINUTE FINALIZATION ---
+  const finalizeMinute = (isFinal: boolean = false) => {
+      const windows = minuteWindowScoresRef.current;
+      
+      // If final, flush pending window first? No, triggerPhaseSwitch calls flushWindow THEN finalizeMinute.
+      // So here we assume windows are up to date.
+      
+      if (windows.length === 0) {
+          if (isFinal) return; // Nothing to record
+          // Else, implies minute just started? But finalize called?
+          // If called by timer, it means 60s elapsed.
       }
+
+      // Calculate Minute Stats
+      let totalScore = 0;
+      let totalAbsentRatio = 0;
+      const count = windows.length;
+
+      windows.forEach(w => {
+          totalScore += w.score;
+          totalAbsentRatio += w.absentRatio;
+      });
+
+      const avgScore = count > 0 ? totalScore / count : 0;
+      const avgAbsent = count > 0 ? totalAbsentRatio / count : 1.0;
 
       let minuteState: InternalMinuteState;
-      
-      // Dynamic Threshold: 10% of expected frames
-      // FIX: use expected FPS instead of unstable realtime FPS
-      const expectedFPS = settings.batterySaverMode ? 2 : 5;
-      const minFrames = expectedFPS * 60 * 0.1;
 
-      // Validity check: Not enough frames -> ABSENT
-      if (currentMinuteFrameCount.current === 0 || currentMinuteFrameCount.current < minFrames) {
+      // Logic: If absent ratio is too high, mark entire minute as ABSENT
+      if (avgAbsent > ABSENT_RATIO_DISTRACT) {
           minuteState = 'ABSENT';
       } else {
-          const avgPenalty = currentMinutePenaltySum.current / currentMinuteFrameCount.current;
-          minuteState = mapPenaltyToMinuteState(avgPenalty);
+          minuteState = mapScoreToLevel(avgScore);
       }
 
+      console.log(`[Algo] Minute Finalized: Score=${avgScore.toFixed(1)}, Absent=${avgAbsent.toFixed(2)}, State=${minuteState}`);
       cycleMinuteHistory.current.push(minuteState);
-      
-      // FIX: Capture count for logging BEFORE reset
-      const capturedCount = currentMinuteFrameCount.current;
 
-      // Reset for next minute
-      currentMinutePenaltySum.current = 0;
-      currentMinuteFrameCount.current = 0;
-      lastLoggedMinute.current = minuteIndex;
+      // Reset Minute
+      minuteWindowScoresRef.current = [];
+      minuteStartTimeRef.current = Date.now();
+  };
+
+  // --- NEW ALGORITHM: WINDOW AGGREGATION ---
+  const flushWindow = (isFinal: boolean = false) => {
+      const frames = windowFrameScoresRef.current;
+      if (frames.length === 0) {
+          // Reset timer if empty (e.g. pause)
+          windowStartTimeRef.current = Date.now();
+          return;
+      }
+
+      // Calculate Stats
+      const totalFrames = frames.length;
+      let scoreSum = 0;
+      let minScore = 100;
+      let absentCount = 0;
+      const scores: number[] = [];
+
+      frames.forEach(f => {
+          scoreSum += f.score;
+          scores.push(f.score);
+          if (f.score < minScore) minScore = f.score;
+          if (f.isAbsent) absentCount++;
+      });
+
+      const avgScore = scoreSum / totalFrames;
+      const absentRatio = absentCount / totalFrames;
+
+      // Stability (Standard Deviation)
+      let sumDiffSq = 0;
+      scores.forEach(s => sumDiffSq += Math.pow(s - avgScore, 2));
+      const variance = sumDiffSq / totalFrames;
+      const stdDev = Math.sqrt(variance);
+      // Stability score: 100 - stdDev (clamped)
+      const stability = Math.max(0, Math.min(100, 100 - stdDev));
+
+      // Window Score Formula
+      // 0.6 * Avg + 0.3 * Min + 0.1 * Stability
+      const windowScore = (0.6 * avgScore) + (0.3 * minScore) + (0.1 * stability);
+
+      // Push to Minute
+      minuteWindowScoresRef.current.push({
+          score: windowScore,
+          absentRatio: absentRatio
+      });
+
+      console.log(`[Algo] Window Flushed: Score=${windowScore.toFixed(1)}, Absent=${absentRatio.toFixed(2)}`);
+
+      // Reset Window
+      windowFrameScoresRef.current = [];
+      windowStartTimeRef.current = Date.now(); // Sync start time to now
       
-      console.log(`[Algorithm] Minute ${minuteIndex} finalized: ${minuteState} (Frames: ${capturedCount}, Min: ${minFrames.toFixed(1)})`);
+      // Trigger Minute Check? (Handled in loop)
   };
 
   // --- CYCLE AGGREGATION ---
@@ -442,7 +577,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       return () => cancelAnimationFrame(requestRef.current);
   }, [sessionState, isAiDisabled, isPaused, isVideoReady, phase, detectionInterval]); 
 
-  // --- TIMER LOGIC (MODIFIED FOR MINUTE AGGREGATION) ---
+  // --- TIMER LOGIC (MODIFIED FOR NEW ALGO) ---
   useEffect(() => {
       if (sessionState !== 'ACTIVE') return;
 
@@ -454,13 +589,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               if (phase === 'WORK') {
                   totalFocusedSecondsRef.current++;
                   currentCycleElapsedRef.current++;
-                  
-                  // Stopwatch minute logging (using while to catch up if needed)
-                  const elapsed = currentCycleElapsedRef.current;
-                  const completedMinuteIndex = Math.floor((elapsed - 1) / 60);
-                  while (completedMinuteIndex > lastLoggedMinute.current) {
-                      finalizeMinute(lastLoggedMinute.current + 1);
-                  }
+                  // Stopwatch algo handling (optional, focusing on Pomodoro for strict cycle)
               }
               return;
           }
@@ -475,13 +604,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               
               const elapsedSeconds = totalFocusedSecondsRef.current;
               
-              // Minute Boundary Check - FIX: Use while loop to catch up missed minutes
-              const elapsed = currentCycleElapsedRef.current;
-              const completedMinuteIndex = Math.floor((elapsed - 1) / 60);
-              while (completedMinuteIndex > lastLoggedMinute.current) {
-                  finalizeMinute(lastLoggedMinute.current + 1);
-              }
-
+              // Notification Check
               if (elapsedSeconds % 60 === 0) {
                   const elapsedMinutes = elapsedSeconds / 60;
                   if (activeNotifications.includes(elapsedMinutes)) {
@@ -522,14 +645,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
   // Moves state to Break
   const triggerPhaseSwitch = () => {
-      // 1. Force finalize current minute correctly
-      const elapsed = currentCycleElapsedRef.current;
-      const finalMinuteIndex = Math.floor((elapsed - 1) / 60);
-
-      // 只在“还有未结算数据”或“确实跨过了新分钟”时，才强制结算最后一分钟，避免重复 push
-      if (finalMinuteIndex > lastLoggedMinute.current || currentMinuteFrameCount.current > 0) {
-          finalizeMinute(finalMinuteIndex, true);
-      }
+      // --- CRITICAL BOUNDARY FLUSH ---
+      // Force finalize partial window and partial minute
+      flushWindow(true); 
+      finalizeMinute(true); 
 
       // 2. Run Cycle Aggregation
       // Minimum Threshold Check (60s) for recording
@@ -539,7 +658,6 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                 currentCamLevel = null;
             } else {
                 currentCamLevel = calculateCycleCameraLevel();
-                // Map ABSENT/Null logic if needed, but calculateCycleCameraLevel handles logic
             }
 
             pendingCycleRef.current = {
@@ -602,11 +720,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       setPhase('WORK');
       currentCycleElapsedRef.current = 0;
       
-      // Reset Aggregation Refs
-      lastLoggedMinute.current = -1;
-      currentMinutePenaltySum.current = 0;
-      currentMinuteFrameCount.current = 0;
+      // Reset Algorithm State
       cycleMinuteHistory.current = [];
+      prevLandmarksRef.current = null;
+      windowFrameScoresRef.current = [];
+      minuteWindowScoresRef.current = [];
+      windowStartTimeRef.current = Date.now();
+      minuteStartTimeRef.current = Date.now();
 
       const workSec = settings.workTime * 60;
       setTimeLeft(workSec);
@@ -625,6 +745,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           const now = Date.now();
           const pausedDuration = now - pauseStartTimeRef.current;
           sessionEndTimeRef.current += pausedDuration; 
+          // Adjust window timers too?
+          // Ideally yes, but tumbling window based on date diff handles breaks naturally by simple reset or just adding time.
+          // For simplicity in this implementation, we just reset window start time on resume to avoid giant window.
+          windowStartTimeRef.current = Date.now();
           setIsPaused(false);
       } else {
           pauseStartTimeRef.current = Date.now();
@@ -686,6 +810,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       }
   };
 
+  // --- MAIN DETECTION LOOP (UPDATED) ---
   const analyzePose_Debug_Visualization = (results: any, video: HTMLVideoElement, canvas: HTMLCanvasElement | null) => {
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
@@ -698,22 +823,127 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const targetFPS = settings.batterySaverMode ? 2 : 5;
       const landmarks = results.landmarks?.[0];
       
-      let newState: 'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT' = 'ABSENT';
+      let frameScore = 0;
+      let isAbsent = false;
+      let frameFocusState: 'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT' = 'ABSENT';
+      
+      // Variables for debug scoring display
+      let currentYaw = 0;
+      let yawDelta = 0;
+      let yawAbs = 0;
+      let scoreHeadRot = 0;
+      
+      let dist = 0; // Head offset distance (static)
+      let scoreHeadOffset = 0;
+      
+      let headMoveDelta = 0; // Head movement (dynamic)
+      let scoreHeadMove = 0;
+
+      let motion = 0; // Body motion distance
+      let scoreBodyMotion = 0;
       
       if (landmarks) {
+          // --- 1. EXTRACT DATA ---
           const nose = landmarks[0];
           const leftEar = landmarks[7];
           const rightEar = landmarks[8];
           const leftShoulder = landmarks[11];
           const rightShoulder = landmarks[12];
+          // const leftWrist = landmarks[15];
+          // const rightWrist = landmarks[16];
 
+          // Calc Center Points
+          const shoulderCenter = {
+              x: (leftShoulder.x + rightShoulder.x) / 2,
+              y: (leftShoulder.y + rightShoulder.y) / 2,
+              z: ((leftShoulder.z || 0) + (rightShoulder.z || 0)) / 2
+          };
+
+          // --- 2. CALCULATE YAW ---
           const headWidth = Math.abs(leftEar.x - rightEar.x);
           const earMidX = (leftEar.x + rightEar.x) / 2;
           const rawYawRatio = (nose.x - earMidX) / headWidth;
           
           smoothYawRef.current = (smoothYawRef.current * 0.7) + (rawYawRatio * 0.3);
-          const currentYaw = smoothYawRef.current * 90;
+          currentYaw = smoothYawRef.current * 90; // Approx degrees
+
+          // --- 3. CALCULATE SCORES ---
           
+          // A. Head Rotation Score (Yaw)
+          yawAbs = Math.abs(currentYaw);
+          scoreHeadRot = 100;
+          if (yawAbs < HEAD_YAW_MILD) scoreHeadRot = 100;
+          else if (yawAbs < HEAD_YAW_DISTRACT) scoreHeadRot = 70;
+          else if (yawAbs < HEAD_YAW_SEVERE) scoreHeadRot = 30;
+          else scoreHeadRot = 0;
+
+          // Yaw Delta (Frequent turning penalty)
+          const prevYaw = prevLandmarksRef.current?.yaw || currentYaw;
+          yawDelta = Math.abs(currentYaw - prevYaw);
+          if (yawDelta > HEAD_YAW_DELTA_THRESHOLD) {
+              scoreHeadRot -= 20;
+          }
+          scoreHeadRot = Math.max(0, Math.min(100, scoreHeadRot));
+
+          // B. Head Offset Score (Static Position vs Calibration)
+          scoreHeadOffset = 100;
+          if (calibrationRef.current.noseBase) {
+              // Simple Euclidean dist from calibrated nose base
+              const dx = nose.x - calibrationRef.current.noseBase.x;
+              const dy = nose.y - calibrationRef.current.noseBase.y;
+              dist = Math.sqrt(dx*dx + dy*dy);
+              
+              if (dist < HEAD_OFFSET_MILD) scoreHeadOffset = 100;
+              else if (dist < HEAD_OFFSET_DISTRACT) scoreHeadOffset = 70;
+              else if (dist < HEAD_OFFSET_SEVERE) scoreHeadOffset = 30;
+              else scoreHeadOffset = 0;
+          }
+
+          // C. Head Move Score (Dynamic Motion) - NEW
+          scoreHeadMove = 100;
+          if (prevLandmarksRef.current) {
+              const prevNose = prevLandmarksRef.current.nose;
+              const dx = nose.x - prevNose.x;
+              const dy = nose.y - prevNose.y;
+              headMoveDelta = Math.sqrt(dx*dx + dy*dy);
+
+              if (headMoveDelta < HEAD_MOVE_MILD) scoreHeadMove = 100;
+              else if (headMoveDelta < HEAD_MOVE_DISTRACT) scoreHeadMove = 80;
+              else if (headMoveDelta < HEAD_MOVE_SEVERE) scoreHeadMove = 40;
+              else scoreHeadMove = 10;
+          }
+
+          // D. Body Motion Score (Shoulder Delta)
+          scoreBodyMotion = 100;
+          if (prevLandmarksRef.current) {
+              const prevCenter = prevLandmarksRef.current.shoulderCenter;
+              const dx = shoulderCenter.x - prevCenter.x;
+              const dy = shoulderCenter.y - prevCenter.y;
+              motion = Math.sqrt(dx*dx + dy*dy);
+
+              if (motion < BODY_MOTION_MILD) scoreBodyMotion = 100;
+              else if (motion < BODY_MOTION_DISTRACT) scoreBodyMotion = 80;
+              else if (motion < BODY_MOTION_SEVERE) scoreBodyMotion = 40;
+              else scoreBodyMotion = 10;
+          }
+
+          // E. Combine (Weighted)
+          const finalScore = 
+              (WEIGHT_BODY_MOTION * scoreBodyMotion) +    // 0.4
+              (WEIGHT_HEAD_OFFSET * scoreHeadOffset) +    // 0.3
+              (WEIGHT_HEAD_MOVE * scoreHeadMove) +        // 0.2
+              (WEIGHT_HEAD_ROTATION * scoreHeadRot) +     // 0.1
+              (WEIGHT_ABSENT * 100);                      // 0.0
+          
+          frameScore = Math.max(0, Math.min(100, finalScore));
+          isAbsent = false;
+
+          // Determine State Label for UI (Display Only)
+          if (frameScore >= 85) frameFocusState = 'DEEP_FLOW';
+          else if (frameScore >= 70) frameFocusState = 'FOCUSED';
+          else frameFocusState = 'DISTRACTED';
+
+          // Check "Too Close"
           const currentShoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
           const baseShoulderWidth = calibrationRef.current.shoulderWidthBase || 0.4; 
           if (currentShoulderWidth > baseShoulderWidth * 1.4) {
@@ -722,65 +952,139 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
              setIsTooClose(false);
           }
 
-          if (Math.abs(currentYaw) > 40) {
-              newState = 'DISTRACTED';
-              setFocusScore(prev => Math.max(0, prev - 0.2));
-          } else if (Math.abs(currentYaw) < 15) {
-              newState = 'DEEP_FLOW';
-              setFocusScore(prev => Math.min(100, prev + 0.1));
-          } else {
-              newState = 'FOCUSED';
-              setFocusScore(prev => Math.min(100, prev + 0.05));
-          }
-          
-          setFocusState(newState);
+          // --- UPDATE PREV REFS ---
+          prevLandmarksRef.current = {
+              nose: { x: nose.x, y: nose.y, z: nose.z },
+              leftShoulder: { x: leftShoulder.x, y: leftShoulder.y, z: leftShoulder.z },
+              rightShoulder: { x: rightShoulder.x, y: rightShoulder.y, z: rightShoulder.z },
+              yaw: currentYaw,
+              shoulderCenter: shoulderCenter
+          };
 
-          ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-          ctx.fillRect(10, 10, 240, 150);
-          ctx.fillStyle = "#00FF00";
-          ctx.font = "14px monospace";
-          ctx.fillText(`Target: ${targetFPS} FPS`, 20, 30);
-          ctx.fillText(`Actual: ${fpsRef.current.toFixed(1)} FPS`, 20, 50);
-          
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(`Points: ${landmarks.length}`, 20, 70);
-          
-          const isFacingFront = Math.abs(currentYaw) < 25; 
-          ctx.fillStyle = isFacingFront ? "#00FF00" : "#FF0000";
-          ctx.fillText(`Head Yaw: ${currentYaw.toFixed(1)}°`, 20, 90);
-          ctx.fillText(newState, 20, 110);
-          
+          // --- DEBUG DRAWING (BOX) ---
           if (drawingUtilsRef.current) {
               const boxW = headWidth * 0.5 * canvas.width;
               const boxH = headWidth * 1.5 * canvas.height;
               const earMidY = (leftEar.y + rightEar.y) / 2;
               const boxX = (earMidX * canvas.width) - (boxW / 2);
               const boxY = (earMidY * canvas.height) - (boxH / 2);
-              
               ctx.strokeStyle = "rgba(0, 255, 0, 0.5)";
               ctx.lineWidth = 2;
               ctx.strokeRect(boxX, boxY, boxW, boxH);
           }
+
       } else {
-          setFocusState('ABSENT');
-          setFocusScore(prev => Math.max(0, prev - 0.1));
+          // NO LANDMARKS DETECTED
+          frameScore = 0;
+          isAbsent = true;
+          frameFocusState = 'ABSENT';
+          
+          // Clear Prev Refs to avoid jump when returning
+          prevLandmarksRef.current = null;
+
+          // Flip context to make text readable (counteract CSS mirror)
+          ctx.save();
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+
           ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
           ctx.fillRect(10, 10, 240, 150);
           ctx.fillStyle = "red";
           ctx.font = "14px monospace";
-          ctx.fillText("NO POSE DETECTED", 20, 70);
+          ctx.fillText("NO POSE DETECTED (未检测到姿态)", 20, 70);
+
+          ctx.restore();
       }
 
-      // --- PENALTY ACCUMULATION ---
-      // FIX: Only accumulate during ACTIVE WORK phase
-      if (
-          !isPaused &&
-          sessionState === 'ACTIVE' &&
-          phase === 'WORK'
-      ) {
-          const penalty = getFramePenalty(newState);
-          currentMinutePenaltySum.current += penalty;
-          currentMinuteFrameCount.current += 1;
+      // --- COMPREHENSIVE DEBUG PANEL ---
+      // This section draws all internal numbers for validation
+      
+      // Flip context to make text readable (counteract CSS mirror)
+      ctx.save();
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+
+      const panelW = 320;
+      const panelH = 450;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.fillRect(10, 10, panelW, panelH);
+      
+      ctx.fillStyle = "#00FF00";
+      ctx.font = "12px monospace";
+      let y = 25;
+      const step = 15;
+
+      ctx.fillText(`FPS (帧率): ${fpsRef.current.toFixed(1)}`, 20, y); y += step;
+      y += 5;
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "14px monospace font-bold";
+      ctx.fillText(`STATE (状态): ${frameFocusState}`, 20, y); y += step + 5;
+      ctx.fillText(`SCORE (得分): ${frameScore.toFixed(1)} / 100`, 20, y); y += step + 10;
+
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "#AAAAAA";
+      ctx.fillText(`--- COMPONENTS (评分组件) ---`, 20, y); y += step;
+
+      // BODY MOTION (0.4)
+      ctx.fillStyle = scoreBodyMotion < 100 ? "#FF5555" : "#FFFFFF";
+      ctx.fillText(`[Body Motion (身体动作)] W:${WEIGHT_BODY_MOTION}`, 20, y); y += step;
+      ctx.fillText(`  Motion: ${motion.toFixed(4)} (Thresh: ${BODY_MOTION_MILD})`, 20, y); y += step;
+      ctx.fillText(`  -> Raw Score: ${scoreBodyMotion}`, 20, y); y += step + 5;
+
+      // HEAD OFFSET (0.3)
+      ctx.fillStyle = scoreHeadOffset < 100 ? "#FF5555" : "#FFFFFF";
+      ctx.fillText(`[Head Offset (位置偏移)] W:${WEIGHT_HEAD_OFFSET}`, 20, y); y += step;
+      ctx.fillText(`  Dist: ${dist.toFixed(4)} (Thresh: ${HEAD_OFFSET_MILD})`, 20, y); y += step;
+      ctx.fillText(`  -> Raw Score: ${scoreHeadOffset}`, 20, y); y += step + 5;
+
+      // HEAD MOVE (0.2)
+      ctx.fillStyle = scoreHeadMove < 100 ? "#FF5555" : "#FFFFFF";
+      ctx.fillText(`[Head Move (头部移动)] W:${WEIGHT_HEAD_MOVE}`, 20, y); y += step;
+      ctx.fillText(`  Delta: ${headMoveDelta.toFixed(4)} (Thresh: ${HEAD_MOVE_MILD})`, 20, y); y += step;
+      ctx.fillText(`  -> Raw Score: ${scoreHeadMove}`, 20, y); y += step + 5;
+
+      // HEAD ROTATION (0.1)
+      ctx.fillStyle = scoreHeadRot < 100 ? "#FF5555" : "#FFFFFF";
+      ctx.fillText(`[Head Rot (头部转动)] W:${WEIGHT_HEAD_ROTATION}`, 20, y); y += step;
+      ctx.fillText(`  Yaw: ${currentYaw.toFixed(1)}° (Abs: ${yawAbs.toFixed(1)})`, 20, y); y += step;
+      ctx.fillText(`  -> Raw Score: ${scoreHeadRot}`, 20, y); y += step + 5;
+
+      // ABSENT
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillText(`[Absent (在场检测)] ${isAbsent ? 'ABSENT' : 'PRESENT'}`, 20, y); y += step + 10;
+
+      ctx.fillStyle = "#FFFF00";
+      ctx.fillText(`--- WINDOW (10s 窗口数据) ---`, 20, y); y += step;
+      const wTime = (Date.now() - windowStartTimeRef.current) / 1000;
+      ctx.fillText(`Elapsed (已过时间): ${wTime.toFixed(1)}s`, 20, y); y += step;
+      ctx.fillText(`Frames Collected (采集帧数): ${windowFrameScoresRef.current.length}`, 20, y); y += step;
+
+      ctx.restore();
+
+      // Update UI State
+      setFocusState(frameFocusState);
+      setFocusScore(frameScore);
+
+      // --- DATA ACCUMULATION (ACTIVE PHASE ONLY) ---
+      if (!isPaused && sessionState === 'ACTIVE' && phase === 'WORK') {
+          // Push Frame Data
+          windowFrameScoresRef.current.push({
+              score: frameScore,
+              isAbsent: isAbsent,
+              timestamp: Date.now()
+          });
+
+          // Check Window Flush (10s)
+          if (Date.now() - windowStartTimeRef.current >= 10000) {
+              flushWindow();
+          }
+          
+          // Check Minute Flush (60s)
+          // Note: Minute logic relies on Date.now() diff from minuteStartTimeRef
+          if (Date.now() - minuteStartTimeRef.current >= 60000) {
+              finalizeMinute();
+          }
       }
   };
 
