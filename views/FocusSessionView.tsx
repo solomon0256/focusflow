@@ -60,13 +60,14 @@ const ABSENT_RATIO_DISTRACT = 0.25;
 
 // -------- WEIGHTS (USER DEFINED) --------
 // 权重总和必须 = 1.0
-// 1. 身体偏移 (Body Motion): 0.4
-const WEIGHT_BODY_MOTION   = 0.40;
-// 2. 位置偏移 (Head Offset - Structural): 0.3
-const WEIGHT_HEAD_OFFSET   = 0.30;
-// 3. 头部移动 (Head Dynamic Move): 0.2
-const WEIGHT_HEAD_MOVE     = 0.20;
-// 4. 头部转动 (Head Rotation Yaw): 0.1
+// UPDATED: User requested adjustment (2024-05-23)
+// 1. 身体偏移 (Body Motion): 0.35 (Down from 0.4)
+const WEIGHT_BODY_MOTION   = 0.35;
+// 2. 位置偏移 (Head Offset - Structural): 0.40 (Up from 0.3)
+const WEIGHT_HEAD_OFFSET   = 0.40;
+// 3. 头部移动 (Head Dynamic Move): 0.15 (Down from 0.2)
+const WEIGHT_HEAD_MOVE     = 0.15;
+// 4. 头部转动 (Head Rotation Yaw): 0.10 (Unchanged)
 const WEIGHT_HEAD_ROTATION = 0.10;
 
 // Absent 权重设为 0，因为 Absent 会直接强制分心，不再参与加权计算
@@ -1177,10 +1178,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
           // E. Combine (Weighted)
           const finalScore = 
-              (WEIGHT_BODY_MOTION * scoreBodyMotion) +    // 0.4
-              (WEIGHT_HEAD_OFFSET * scoreHeadOffset) +    // 0.3
-              (WEIGHT_HEAD_MOVE * scoreHeadMove) +        // 0.2
-              (WEIGHT_HEAD_ROTATION * scoreHeadRot) +     // 0.1
+              (WEIGHT_BODY_MOTION * scoreBodyMotion) +    // 0.35
+              (WEIGHT_HEAD_OFFSET * scoreHeadOffset) +    // 0.40
+              (WEIGHT_HEAD_MOVE * scoreHeadMove) +        // 0.15
+              (WEIGHT_HEAD_ROTATION * scoreHeadRot) +     // 0.10
               (WEIGHT_ABSENT * 100);                      // 0.0
           
           frameScore = Math.max(0, Math.min(100, finalScore));
@@ -1276,13 +1277,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.fillStyle = "#AAAAAA";
       ctx.fillText(`--- COMPONENTS (评分组件) ---`, 20, y); y += step;
 
-      // BODY MOTION (0.4)
+      // BODY MOTION (0.35)
       ctx.fillStyle = scoreBodyMotion < 100 ? "#FF5555" : "#FFFFFF";
       ctx.fillText(`[Body Motion (身体动作)] W:${WEIGHT_BODY_MOTION}`, 20, y); y += step;
       ctx.fillText(`  Motion: ${motion.toFixed(4)} (Thresh: ${BODY_MOTION_MILD})`, 20, y); y += step;
       ctx.fillText(`  -> Raw Score: ${scoreBodyMotion}`, 20, y); y += step + 5;
 
-      // HEAD OFFSET (0.3) - UPDATED DEBUG INFO
+      // HEAD OFFSET (0.40) - UPDATED DEBUG INFO
       ctx.fillStyle = scoreHeadOffset < 100 ? "#FF5555" : "#FFFFFF";
       ctx.fillText(`[Struct Offset (姿态偏移)] W:${WEIGHT_HEAD_OFFSET}`, 20, y); y += step;
       // Show Dynamic Ref Indicator
@@ -1293,13 +1294,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.fillText(`  S(形变): ${metricS.toFixed(3)} (T:${OFFSET_S_THRESHOLD})`, 20, y); y += step;
       ctx.fillText(`  -> Raw Score: ${scoreHeadOffset.toFixed(1)}`, 20, y); y += step + 5;
 
-      // HEAD MOVE (0.2)
+      // HEAD MOVE (0.15)
       ctx.fillStyle = scoreHeadMove < 100 ? "#FF5555" : "#FFFFFF";
       ctx.fillText(`[Head Move (头部移动)] W:${WEIGHT_HEAD_MOVE}`, 20, y); y += step;
       ctx.fillText(`  Delta: ${headMoveDelta.toFixed(4)} (Thresh: ${HEAD_MOVE_MILD})`, 20, y); y += step;
       ctx.fillText(`  -> Raw Score: ${scoreHeadMove}`, 20, y); y += step + 5;
 
-      // HEAD ROTATION (0.1)
+      // HEAD ROTATION (0.10)
       ctx.fillStyle = scoreHeadRot < 100 ? "#FF5555" : "#FFFFFF";
       ctx.fillText(`[Head Rot (头部转动)] W:${WEIGHT_HEAD_ROTATION}`, 20, y); y += step;
       ctx.fillText(`  Yaw: ${currentYaw.toFixed(1)}° (Abs: ${yawAbs.toFixed(1)})`, 20, y); y += step;
