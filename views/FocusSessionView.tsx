@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Square, Play, Pause, Brain, AlertTriangle, Move, Eye, EyeOff, User as UserIcon, Coffee, Armchair, FastForward, CheckCircle2, Sparkles, Bell, Bug, Battery, Monitor, RotateCcw, Headphones, BarChart2, Star, X } from 'lucide-react';
@@ -200,6 +201,39 @@ interface WindowScore {
     absentRatio: number;
 }
 
+// --- NEW DATA STRUCTURES FOR SLIDING REFERENCE ---
+interface PostureRef {
+    shoulderCenter: { x: number, y: number, z?: number };
+    shoulderAngle: number;
+    noseRelative: { x: number, y: number };
+    scale: number;
+    updatedAt: number; // Added for debug
+    updateReason: string; // Added for debug
+}
+
+interface WindowAccumulator {
+    count: number;
+    sumCenter: { x: number, y: number, z: number };
+    sumNoseRel: { x: number, y: number };
+    sumScale: number;
+    sumSinAngle: number;
+    sumCosAngle: number;
+}
+
+interface PostureSnapshot {
+    timestamp: number;
+    ref: PostureRef;
+}
+
+// Helper: Debug Info Structure
+interface RefDebugInfo {
+    updated: boolean;
+    updatedAt: number;
+    reason: string;
+    lastCount: number;
+    skipReason?: string;
+}
+
 // 辅助函数：限制数值范围
 const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
@@ -238,6 +272,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   
   // Cycle History (Legacy Interface)
   const cycleMinuteHistory = useRef<InternalMinuteState[]>([]);
+
+  // --- NEW: SLIDING REFERENCE SYSTEM ---
+  const windowReferenceRef = useRef<PostureRef | null>(null);
+  const windowAccumulatorRef = useRef<WindowAccumulator>({ count: 0, sumCenter: {x:0,y:0,z:0}, sumNoseRel: {x:0,y:0}, sumScale: 0, sumSinAngle: 0, sumCosAngle: 0 });
+  const postureHistoryRef = useRef<PostureSnapshot[]>([]);
+  const refDebugInfoRef = useRef<RefDebugInfo>({ updated: false, updatedAt: 0, reason: 'Init', lastCount: 0 });
 
   // Sync phase to parent
   useEffect(() => {
@@ -281,15 +321,14 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const fpsRef = useRef<number>(0);
   const smoothYawRef = useRef<number>(0); 
   
-  // Updated Calibration Ref with Structural Data
+  // Updated Calibration Ref with Structural Data (Keep as STATIC BASELINE)
   const calibrationRef = useRef<{ 
-      noseBase: { x: number, y: number } | null; // Keep for legacy compatibility if needed
+      noseBase: { x: number, y: number } | null;
       shoulderWidthBase: number | null; 
-      // New Structural Baselines
       baseShoulderCenter?: { x: number, y: number };
-      baseShoulderAngle?: number; // radians
-      baseNoseRelative?: { x: number, y: number }; // normalized relative pos
-      baseScale?: number; // shoulder width used for normalization
+      baseShoulderAngle?: number; 
+      baseNoseRelative?: { x: number, y: number }; 
+      baseScale?: number; 
   }>({ noseBase: null, shoulderWidthBase: null });
 
   const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
@@ -422,7 +461,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                  const rightShoulder = pose[12];
 
                  // Basic Calibration
-                 const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+                 const shoulderWidth = getDistance(leftShoulder, rightShoulder);
                  
                  // Structural Calibration
                  const shoulderCenter = {
@@ -434,7 +473,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                  const shoulderAngle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x);
                  
                  // Calculate Relative Nose Position (Normalized by Scale)
-                 const scale = shoulderWidth || 0.4; // fallback safe scale
+                 const scale = Math.max(shoulderWidth, 0.1); // Clamp safe scale
                  const noseRel = {
                      x: (nose.x - shoulderCenter.x) / scale,
                      y: (nose.y - shoulderCenter.y) / scale
@@ -448,6 +487,23 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                      baseNoseRelative: noseRel,
                      baseScale: scale
                  };
+
+                 // --- BOOTSTRAP SLIDING REFERENCE ---
+                 windowReferenceRef.current = {
+                     shoulderCenter: shoulderCenter,
+                     shoulderAngle: shoulderAngle,
+                     noseRelative: noseRel,
+                     scale: scale,
+                     updatedAt: Date.now(),
+                     updateReason: 'Bootstrap'
+                 };
+                 
+                 refDebugInfoRef.current = {
+                     updated: true,
+                     updatedAt: Date.now(),
+                     reason: 'Bootstrap',
+                     lastCount: 1
+                 };
              }
           } catch(e) {}
       }
@@ -457,6 +513,11 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       prevLandmarksRef.current = null;
       windowFrameScoresRef.current = [];
       minuteWindowScoresRef.current = [];
+      
+      // Reset Sliding Accumulator & History
+      windowAccumulatorRef.current = { count: 0, sumCenter: {x:0,y:0,z:0}, sumNoseRel: {x:0,y:0}, sumScale: 0, sumSinAngle: 0, sumCosAngle: 0 };
+      postureHistoryRef.current = [];
+
       windowStartTimeRef.current = Date.now();
       minuteStartTimeRef.current = Date.now();
 
@@ -479,13 +540,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const finalizeMinute = (isFinal: boolean = false) => {
       const windows = minuteWindowScoresRef.current;
       
-      // If final, flush pending window first? No, triggerPhaseSwitch calls flushWindow THEN finalizeMinute.
-      // So here we assume windows are up to date.
-      
       if (windows.length === 0) {
           if (isFinal) return; // Nothing to record
-          // Else, implies minute just started? But finalize called?
-          // If called by timer, it means 60s elapsed.
       }
 
       // Calculate Minute Stats
@@ -518,16 +574,17 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       minuteStartTimeRef.current = Date.now();
   };
 
-  // --- NEW ALGORITHM: WINDOW AGGREGATION ---
+  // --- NEW ALGORITHM: WINDOW AGGREGATION & REFERENCE UPDATE ---
   const flushWindow = (isFinal: boolean = false) => {
       const frames = windowFrameScoresRef.current;
+      
+      // Even if no frames, we must reset windowStartTime to ensure the loop continues
       if (frames.length === 0) {
-          // Reset timer if empty (e.g. pause)
           windowStartTimeRef.current = Date.now();
           return;
       }
 
-      // Calculate Stats
+      // 1. Calculate Window Score
       const totalFrames = frames.length;
       let scoreSum = 0;
       let minScore = 100;
@@ -549,14 +606,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       scores.forEach(s => sumDiffSq += Math.pow(s - avgScore, 2));
       const variance = sumDiffSq / totalFrames;
       const stdDev = Math.sqrt(variance);
-      // Stability score: 100 - stdDev (clamped)
       const stability = Math.max(0, Math.min(100, 100 - stdDev));
 
-      // Window Score Formula
-      // 0.6 * Avg + 0.3 * Min + 0.1 * Stability
       const windowScore = (0.6 * avgScore) + (0.3 * minScore) + (0.1 * stability);
 
-      // Push to Minute
       minuteWindowScoresRef.current.push({
           score: windowScore,
           absentRatio: absentRatio
@@ -564,11 +617,71 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
 
       console.log(`[Algo] Window Flushed: Score=${windowScore.toFixed(1)}, Absent=${absentRatio.toFixed(2)}`);
 
-      // Reset Window
-      windowFrameScoresRef.current = [];
-      windowStartTimeRef.current = Date.now(); // Sync start time to now
+      // 2. Update Reference (Sliding Window - STRICT HARD SWITCH)
+      const acc = windowAccumulatorRef.current;
+      const MIN_SAMPLES = 10; // Minimum frames required to update reference
       
-      // Trigger Minute Check? (Handled in loop)
+      // LOGIC: Check eligibility
+      // Strict conditions: Enough samples, WORK phase, Not paused, Not final flush
+      const isEligible = acc.count >= MIN_SAMPLES && phase === 'WORK' && !isPaused && !isFinal;
+
+      if (isEligible) {
+          // --- HARD SWITCH UPDATE ---
+          const avgCenter = {
+              x: acc.sumCenter.x / acc.count,
+              y: acc.sumCenter.y / acc.count,
+              z: acc.sumCenter.z / acc.count
+          };
+          const avgScale = acc.sumScale / acc.count;
+          const avgNoseRel = {
+              x: acc.sumNoseRel.x / acc.count,
+              y: acc.sumNoseRel.y / acc.count
+          };
+          // Vector Average for Angle
+          const avgAngle = Math.atan2(acc.sumSinAngle / acc.count, acc.sumCosAngle / acc.count);
+          
+          // Direct assignment (Hard Switch)
+          windowReferenceRef.current = {
+              shoulderCenter: avgCenter,
+              scale: avgScale,
+              noseRelative: avgNoseRel,
+              shoulderAngle: avgAngle,
+              updatedAt: Date.now(),
+              updateReason: 'WindowFlush'
+          };
+          
+          // Debug Update
+          refDebugInfoRef.current = {
+              updated: true,
+              updatedAt: Date.now(),
+              reason: 'HardSwitch',
+              lastCount: acc.count
+          };
+
+          // 3. Snapshot for History (every 10s if updated)
+          postureHistoryRef.current.push({ 
+              timestamp: Date.now(), 
+              ref: { ...windowReferenceRef.current } 
+          });
+
+          // 4. RESET ACCUMULATOR (Only on success)
+          windowAccumulatorRef.current = { count: 0, sumCenter: {x:0,y:0,z:0}, sumNoseRel: {x:0,y:0}, sumScale: 0, sumSinAngle: 0, sumCosAngle: 0 };
+
+      } else {
+          // --- SKIP UPDATE ---
+          // DO NOT RESET ACCUMULATOR: Keep accumulating for next window
+          refDebugInfoRef.current = {
+              ...refDebugInfoRef.current,
+              updated: false,
+              lastCount: acc.count,
+              skipReason: `cnt:${acc.count},ph:${phase},p:${isPaused}`
+          };
+      }
+
+      // 5. Always Reset Frame Buffer & Window Time
+      // This ensures 10s heartbeat remains visual, even if accumulator spans multiple windows
+      windowFrameScoresRef.current = [];
+      windowStartTimeRef.current = Date.now();
   };
 
   // --- CYCLE AGGREGATION ---
@@ -782,6 +895,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       minuteWindowScoresRef.current = [];
       windowStartTimeRef.current = Date.now();
       minuteStartTimeRef.current = Date.now();
+      
+      // Reset Sliding Accumulators
+      windowAccumulatorRef.current = { count: 0, sumCenter: {x:0,y:0,z:0}, sumNoseRel: {x:0,y:0}, sumScale: 0, sumSinAngle: 0, sumCosAngle: 0 };
 
       const workSec = settings.workTime * 60;
       setTimeLeft(workSec);
@@ -800,9 +916,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           const now = Date.now();
           const pausedDuration = now - pauseStartTimeRef.current;
           sessionEndTimeRef.current += pausedDuration; 
-          // Adjust window timers too?
-          // Ideally yes, but tumbling window based on date diff handles breaks naturally by simple reset or just adding time.
-          // For simplicity in this implementation, we just reset window start time on resume to avoid giant window.
+          // Reset window start time on resume to avoid giant window
           windowStartTimeRef.current = Date.now();
           setIsPaused(false);
       } else {
@@ -942,39 +1056,78 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           }
           scoreHeadRot = Math.max(0, Math.min(100, scoreHeadRot));
 
-          // B. Head Offset Score (Structural 3-Component Model)
-          if (calibrationRef.current.baseShoulderCenter && 
-              calibrationRef.current.baseShoulderAngle !== undefined &&
-              calibrationRef.current.baseNoseRelative &&
-              calibrationRef.current.baseScale) {
-              
-              const { baseShoulderCenter, baseShoulderAngle, baseNoseRelative, baseScale } = calibrationRef.current;
-              
-              // 1. Current Frame Metrics
-              const currScale = Math.abs(leftShoulder.x - rightShoulder.x) || baseScale; // Fallback to base
-              const currCenter = shoulderCenter;
-              const currAngle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x);
-              
-              const currNoseRelative = {
-                  x: (nose.x - currCenter.x) / currScale,
-                  y: (nose.y - currCenter.y) / currScale
+          // B. Head Offset Score (Structural 3-Component Model with SLIDING REFERENCE)
+          // 1. Current Frame Metrics
+          // Scale: 2D Euclidean Distance, Clamped
+          const shoulderWidth2D = getDistance(leftShoulder, rightShoulder);
+          const currScale = Math.max(shoulderWidth2D, 0.1); 
+          
+          const currCenter = shoulderCenter;
+          const currAngle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x);
+          
+          const currNoseRelative = {
+              x: (nose.x - currCenter.x) / currScale,
+              y: (nose.y - currCenter.y) / currScale
+          };
+
+          // ACCUMULATE FRAME DATA (For Sliding Window Reference)
+          if (!isPaused && phase === 'WORK') {
+              const acc = windowAccumulatorRef.current;
+              acc.count++;
+              acc.sumCenter.x += currCenter.x;
+              acc.sumCenter.y += currCenter.y;
+              acc.sumCenter.z += (currCenter.z || 0);
+              acc.sumScale += currScale;
+              acc.sumNoseRel.x += currNoseRelative.x;
+              acc.sumNoseRel.y += currNoseRelative.y;
+              // Accumulate vectors for angular average
+              acc.sumSinAngle += Math.sin(currAngle);
+              acc.sumCosAngle += Math.cos(currAngle);
+          }
+
+          // USE REFERENCE (Priority: Sliding Window Ref > Static Calibration)
+          // Resolving reference data explicitly to satisfy TypeScript union constraints
+          let refData = null;
+
+          if (windowReferenceRef.current) {
+              refData = {
+                  center: windowReferenceRef.current.shoulderCenter,
+                  angle: windowReferenceRef.current.shoulderAngle,
+                  nose: windowReferenceRef.current.noseRelative,
+                  scale: windowReferenceRef.current.scale
               };
+          } else {
+              const cal = calibrationRef.current;
+              if (cal.baseShoulderCenter && 
+                  cal.baseShoulderAngle !== undefined &&
+                  cal.baseNoseRelative && 
+                  cal.baseScale) {
+                  refData = {
+                      center: cal.baseShoulderCenter,
+                      angle: cal.baseShoulderAngle,
+                      nose: cal.baseNoseRelative,
+                      scale: cal.baseScale
+                  };
+              }
+          }
+
+          if (refData) {
+              const { center: baseCenter, angle: baseAngle, nose: baseNose, scale: baseScale } = refData;
 
               // 2. Compute Deviations (Metrics)
               
               // T: Translation (Distance of shoulder center from base, normalized by baseScale)
-              metricT = getDistance(currCenter, baseShoulderCenter) / baseScale;
+              metricT = getDistance(currCenter, baseCenter) / baseScale;
               
               // R: Rotation (Angle difference)
               // Handle angle wrap-around using sin/cos
-              const angleDiff = currAngle - baseShoulderAngle;
+              const angleDiff = currAngle - baseAngle;
               metricR = Math.abs(Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)));
               
               // S: Structure (Nose position relative to shoulders vs base, scale-invariant)
-              metricS = getDistance(currNoseRelative, baseNoseRelative);
+              metricS = getDistance(currNoseRelative, baseNose);
 
               // 3. Normalize & Weight
-              // Normalize to 0-1 range based on thresholds
               const normT = clamp(metricT / OFFSET_T_THRESHOLD, 0, 1);
               const normR = clamp(metricR / OFFSET_R_THRESHOLD, 0, 1);
               const normS = clamp(metricS / OFFSET_S_THRESHOLD, 0, 1);
@@ -986,7 +1139,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               scoreHeadOffset = 100 * (1 - weightedError);
               
           } else {
-              // Fallback if calibration missing (shouldn't happen in ACTIVE)
+              // Fallback
               scoreHeadOffset = 100;
           }
 
@@ -1096,7 +1249,7 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.scale(-1, 1);
 
       const panelW = 320;
-      const panelH = 450;
+      const panelH = 500; // Increased height for more stats
       ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
       ctx.fillRect(10, 10, panelW, panelH);
       
@@ -1126,6 +1279,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       // HEAD OFFSET (0.3) - UPDATED DEBUG INFO
       ctx.fillStyle = scoreHeadOffset < 100 ? "#FF5555" : "#FFFFFF";
       ctx.fillText(`[Struct Offset (姿态偏移)] W:${WEIGHT_HEAD_OFFSET}`, 20, y); y += step;
+      // Show Dynamic Ref Indicator
+      const isDynamic = !!windowReferenceRef.current;
+      ctx.fillText(`  Ref Source: ${isDynamic ? 'DYNAMIC (滑动参考)' : 'STATIC (静态校准)'}`, 20, y); y += step;
       ctx.fillText(`  T(平移): ${metricT.toFixed(3)} (T:${OFFSET_T_THRESHOLD})`, 20, y); y += step;
       ctx.fillText(`  R(旋转): ${metricR.toFixed(3)} (T:${OFFSET_R_THRESHOLD})`, 20, y); y += step;
       ctx.fillText(`  S(形变): ${metricS.toFixed(3)} (T:${OFFSET_S_THRESHOLD})`, 20, y); y += step;
@@ -1147,11 +1303,30 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.fillStyle = "#FFFFFF";
       ctx.fillText(`[Absent (在场检测)] ${isAbsent ? 'ABSENT' : 'PRESENT'}`, 20, y); y += step + 10;
 
+      // --- NEW WINDOW DEBUG SECTION ---
       ctx.fillStyle = "#FFFF00";
-      ctx.fillText(`--- WINDOW (10s 窗口数据) ---`, 20, y); y += step;
+      ctx.fillText(`--- WINDOW (10s 窗口) ---`, 20, y); y += step;
+      
       const wTime = (Date.now() - windowStartTimeRef.current) / 1000;
-      ctx.fillText(`Elapsed (已过时间): ${wTime.toFixed(1)}s`, 20, y); y += step;
-      ctx.fillText(`Frames Collected (采集帧数): ${windowFrameScoresRef.current.length}`, 20, y); y += step;
+      ctx.fillText(`Elapsed: ${wTime.toFixed(1)}s / 10s`, 20, y); y += step;
+      
+      // Update Status Info
+      const refInfo = refDebugInfoRef.current;
+      const timeSinceUpdate = (Date.now() - refInfo.updatedAt) / 1000;
+      
+      ctx.fillStyle = refInfo.updated ? "#00FF00" : "#FFA500";
+      ctx.fillText(`Ref Updated: ${refInfo.updated ? 'YES' : 'NO'} (${timeSinceUpdate.toFixed(1)}s ago)`, 20, y); y += step;
+      
+      ctx.fillStyle = "#DDDDDD";
+      ctx.fillText(`Reason: ${refInfo.reason}`, 20, y); y += step;
+      
+      if (!refInfo.updated && refInfo.skipReason) {
+          ctx.fillStyle = "#FF5555";
+          ctx.fillText(`Skip: ${refInfo.skipReason}`, 20, y); y += step;
+      }
+      
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillText(`Acc Samples: ${windowAccumulatorRef.current.count}`, 20, y); y += step;
 
       ctx.restore();
 
@@ -1168,13 +1343,12 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
               timestamp: Date.now()
           });
 
-          // Check Window Flush (10s)
+          // Check Window Flush (Strict 10s trigger)
           if (Date.now() - windowStartTimeRef.current >= 10000) {
               flushWindow();
           }
           
           // Check Minute Flush (60s)
-          // Note: Minute logic relies on Date.now() diff from minuteStartTimeRef
           if (Date.now() - minuteStartTimeRef.current >= 60000) {
               finalizeMinute();
           }
