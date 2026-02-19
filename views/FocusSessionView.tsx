@@ -25,8 +25,16 @@ const HEAD_YAW_SEVERE = 60;
 // 每帧变化超过该值，认为是“频繁扭头”
 const HEAD_YAW_DELTA_THRESHOLD = 12;
 
-// -------- HEAD POSITION OFFSET THRESHOLD (normalized screen ratio) --------
-// 鼻子相对校准中心偏移比例 (Static Position)
+// -------- STRUCTURAL OFFSET THRESHOLDS (Normalized) --------
+// B级方案：中等宽容 (Moderate Tolerance)
+// 1. 平移阈值 (Translation): 允许身体中心移动 25% 肩宽
+const OFFSET_T_THRESHOLD = 0.25; 
+// 2. 旋转阈值 (Rotation): 允许身体旋转 ~20度 (0.35弧度)
+const OFFSET_R_THRESHOLD = 0.35; 
+// 3. 形变阈值 (Structure): 允许鼻子相对肩部结构形变 20% 肩宽 (如轻微低头/仰头)
+const OFFSET_S_THRESHOLD = 0.20;
+
+// 旧的简单阈值 (保留作为备用参考，虽然主要逻辑已切换)
 const HEAD_OFFSET_MILD = 0.08;
 const HEAD_OFFSET_DISTRACT = 0.18;
 const HEAD_OFFSET_SEVERE = 0.28;
@@ -51,7 +59,7 @@ const ABSENT_RATIO_DISTRACT = 0.25;
 // 权重总和必须 = 1.0
 // 1. 身体偏移 (Body Motion): 0.4
 const WEIGHT_BODY_MOTION   = 0.40;
-// 2. 位置偏移 (Head Static Offset): 0.3
+// 2. 位置偏移 (Head Offset - Structural): 0.3
 const WEIGHT_HEAD_OFFSET   = 0.30;
 // 3. 头部移动 (Head Dynamic Move): 0.2
 const WEIGHT_HEAD_MOVE     = 0.20;
@@ -192,6 +200,16 @@ interface WindowScore {
     absentRatio: number;
 }
 
+// 辅助函数：限制数值范围
+const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
+
+// 辅助函数：计算欧几里得距离
+const getDistance = (p1: {x: number, y: number}, p2: {x: number, y: number}) => {
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    return Math.sqrt(dx*dx + dy*dy);
+};
+
 const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeInSeconds, settings, setSettings, task, user, onComplete, onCancel, onUpgradeTrigger, onPhaseChange }) => {
   const t = translations[settings.language].session;
   
@@ -262,7 +280,17 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
   const lastPredictionTimeRef = useRef<number>(0);
   const fpsRef = useRef<number>(0);
   const smoothYawRef = useRef<number>(0); 
-  const calibrationRef = useRef<{ noseBase: { x: number, y: number } | null; shoulderWidthBase: number | null; }>({ noseBase: null, shoulderWidthBase: null });
+  
+  // Updated Calibration Ref with Structural Data
+  const calibrationRef = useRef<{ 
+      noseBase: { x: number, y: number } | null; // Keep for legacy compatibility if needed
+      shoulderWidthBase: number | null; 
+      // New Structural Baselines
+      baseShoulderCenter?: { x: number, y: number };
+      baseShoulderAngle?: number; // radians
+      baseNoseRelative?: { x: number, y: number }; // normalized relative pos
+      baseScale?: number; // shoulder width used for normalization
+  }>({ noseBase: null, shoulderWidthBase: null });
 
   const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
   const [focusScore, setFocusScore] = useState(100); 
@@ -389,9 +417,36 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
              const result = landmarker.detectForVideo(video, performance.now());
              if (result.landmarks && result.landmarks.length > 0) {
                  const pose = result.landmarks[0];
+                 const nose = pose[0];
+                 const leftShoulder = pose[11];
+                 const rightShoulder = pose[12];
+
+                 // Basic Calibration
+                 const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+                 
+                 // Structural Calibration
+                 const shoulderCenter = {
+                     x: (leftShoulder.x + rightShoulder.x) / 2,
+                     y: (leftShoulder.y + rightShoulder.y) / 2
+                 };
+                 
+                 // Calculate Angle (radians)
+                 const shoulderAngle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x);
+                 
+                 // Calculate Relative Nose Position (Normalized by Scale)
+                 const scale = shoulderWidth || 0.4; // fallback safe scale
+                 const noseRel = {
+                     x: (nose.x - shoulderCenter.x) / scale,
+                     y: (nose.y - shoulderCenter.y) / scale
+                 };
+
                  calibrationRef.current = {
-                     noseBase: { x: pose[0].x, y: pose[0].y },
-                     shoulderWidthBase: Math.abs(pose[11].x - pose[12].x)
+                     noseBase: { x: nose.x, y: nose.y },
+                     shoulderWidthBase: shoulderWidth,
+                     baseShoulderCenter: shoulderCenter,
+                     baseShoulderAngle: shoulderAngle,
+                     baseNoseRelative: noseRel,
+                     baseScale: scale
                  };
              }
           } catch(e) {}
@@ -833,7 +888,9 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       let yawAbs = 0;
       let scoreHeadRot = 0;
       
-      let dist = 0; // Head offset distance (static)
+      let metricT = 0; // Translation
+      let metricR = 0; // Rotation
+      let metricS = 0; // Structure
       let scoreHeadOffset = 0;
       
       let headMoveDelta = 0; // Head movement (dynamic)
@@ -885,21 +942,55 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           }
           scoreHeadRot = Math.max(0, Math.min(100, scoreHeadRot));
 
-          // B. Head Offset Score (Static Position vs Calibration)
-          scoreHeadOffset = 100;
-          if (calibrationRef.current.noseBase) {
-              // Simple Euclidean dist from calibrated nose base
-              const dx = nose.x - calibrationRef.current.noseBase.x;
-              const dy = nose.y - calibrationRef.current.noseBase.y;
-              dist = Math.sqrt(dx*dx + dy*dy);
+          // B. Head Offset Score (Structural 3-Component Model)
+          if (calibrationRef.current.baseShoulderCenter && 
+              calibrationRef.current.baseShoulderAngle !== undefined &&
+              calibrationRef.current.baseNoseRelative &&
+              calibrationRef.current.baseScale) {
               
-              if (dist < HEAD_OFFSET_MILD) scoreHeadOffset = 100;
-              else if (dist < HEAD_OFFSET_DISTRACT) scoreHeadOffset = 70;
-              else if (dist < HEAD_OFFSET_SEVERE) scoreHeadOffset = 30;
-              else scoreHeadOffset = 0;
+              const { baseShoulderCenter, baseShoulderAngle, baseNoseRelative, baseScale } = calibrationRef.current;
+              
+              // 1. Current Frame Metrics
+              const currScale = Math.abs(leftShoulder.x - rightShoulder.x) || baseScale; // Fallback to base
+              const currCenter = shoulderCenter;
+              const currAngle = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x);
+              
+              const currNoseRelative = {
+                  x: (nose.x - currCenter.x) / currScale,
+                  y: (nose.y - currCenter.y) / currScale
+              };
+
+              // 2. Compute Deviations (Metrics)
+              
+              // T: Translation (Distance of shoulder center from base, normalized by baseScale)
+              metricT = getDistance(currCenter, baseShoulderCenter) / baseScale;
+              
+              // R: Rotation (Angle difference)
+              // Handle angle wrap-around using sin/cos
+              const angleDiff = currAngle - baseShoulderAngle;
+              metricR = Math.abs(Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)));
+              
+              // S: Structure (Nose position relative to shoulders vs base, scale-invariant)
+              metricS = getDistance(currNoseRelative, baseNoseRelative);
+
+              // 3. Normalize & Weight
+              // Normalize to 0-1 range based on thresholds
+              const normT = clamp(metricT / OFFSET_T_THRESHOLD, 0, 1);
+              const normR = clamp(metricR / OFFSET_R_THRESHOLD, 0, 1);
+              const normS = clamp(metricS / OFFSET_S_THRESHOLD, 0, 1);
+
+              // Calculate Weighted Error (0 = Perfect, 1 = Max Error)
+              const weightedError = (0.4 * normT) + (0.3 * normR) + (0.3 * normS);
+              
+              // Convert to Score (100 = Perfect, 0 = Bad)
+              scoreHeadOffset = 100 * (1 - weightedError);
+              
+          } else {
+              // Fallback if calibration missing (shouldn't happen in ACTIVE)
+              scoreHeadOffset = 100;
           }
 
-          // C. Head Move Score (Dynamic Motion) - NEW
+          // C. Head Move Score (Dynamic Motion)
           scoreHeadMove = 100;
           if (prevLandmarksRef.current) {
               const prevNose = prevLandmarksRef.current.nose;
@@ -1032,11 +1123,13 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       ctx.fillText(`  Motion: ${motion.toFixed(4)} (Thresh: ${BODY_MOTION_MILD})`, 20, y); y += step;
       ctx.fillText(`  -> Raw Score: ${scoreBodyMotion}`, 20, y); y += step + 5;
 
-      // HEAD OFFSET (0.3)
+      // HEAD OFFSET (0.3) - UPDATED DEBUG INFO
       ctx.fillStyle = scoreHeadOffset < 100 ? "#FF5555" : "#FFFFFF";
-      ctx.fillText(`[Head Offset (位置偏移)] W:${WEIGHT_HEAD_OFFSET}`, 20, y); y += step;
-      ctx.fillText(`  Dist: ${dist.toFixed(4)} (Thresh: ${HEAD_OFFSET_MILD})`, 20, y); y += step;
-      ctx.fillText(`  -> Raw Score: ${scoreHeadOffset}`, 20, y); y += step + 5;
+      ctx.fillText(`[Struct Offset (姿态偏移)] W:${WEIGHT_HEAD_OFFSET}`, 20, y); y += step;
+      ctx.fillText(`  T(平移): ${metricT.toFixed(3)} (T:${OFFSET_T_THRESHOLD})`, 20, y); y += step;
+      ctx.fillText(`  R(旋转): ${metricR.toFixed(3)} (T:${OFFSET_R_THRESHOLD})`, 20, y); y += step;
+      ctx.fillText(`  S(形变): ${metricS.toFixed(3)} (T:${OFFSET_S_THRESHOLD})`, 20, y); y += step;
+      ctx.fillText(`  -> Raw Score: ${scoreHeadOffset.toFixed(1)}`, 20, y); y += step + 5;
 
       // HEAD MOVE (0.2)
       ctx.fillStyle = scoreHeadMove < 100 ? "#FF5555" : "#FFFFFF";
