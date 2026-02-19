@@ -16,11 +16,12 @@ import { SoundSelector } from '../components/SoundSelector';
 
 // -------- HEAD ROTATION THRESHOLDS (degrees) --------
 // 轻度偏转：开始认为注意力下降
-const HEAD_YAW_MILD = 20;
+// UPDATED: Tightened by 10 degrees as requested
+const HEAD_YAW_MILD = 10;
 // 明确分心：强惩罚区
-const HEAD_YAW_DISTRACT = 40;
+const HEAD_YAW_DISTRACT = 30;
 // 极端分心：几乎完全离开工作区域
-const HEAD_YAW_SEVERE = 60;
+const HEAD_YAW_SEVERE = 50;
 
 // -------- HEAD ROTATION CHANGE THRESHOLD (degrees per frame) --------
 // 每帧变化超过该值，认为是“频繁扭头”
@@ -48,9 +49,10 @@ const HEAD_MOVE_SEVERE = 0.08;
 
 // -------- BODY MOTION THRESHOLD --------
 // 肩部中心位移（normalized）
-const BODY_MOTION_MILD = 0.015;
-const BODY_MOTION_DISTRACT = 0.035;
-const BODY_MOTION_SEVERE = 0.060;
+// UPDATED: Tightened from 0.015 to 0.010 as requested
+const BODY_MOTION_MILD = 0.010;
+const BODY_MOTION_DISTRACT = 0.025; // Adjusted proportionally
+const BODY_MOTION_SEVERE = 0.050;   // Adjusted proportionally
 
 // -------- ABSENT THRESHOLD --------
 // 连续无检测帧比例
@@ -331,7 +333,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       baseScale?: number; 
   }>({ noseBase: null, shoulderWidthBase: null });
 
-  const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
+  // UPDATED: Added 'LOW_FOCUS' to UI state
+  const [focusState, setFocusState] = useState<'DEEP_FLOW' | 'FOCUSED' | 'LOW_FOCUS' | 'DISTRACTED' | 'ABSENT'>('FOCUSED');
   const [focusScore, setFocusScore] = useState(100); 
 
   useEffect(() => {
@@ -994,7 +997,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       
       let frameScore = 0;
       let isAbsent = false;
-      let frameFocusState: 'DEEP_FLOW' | 'FOCUSED' | 'DISTRACTED' | 'ABSENT' = 'ABSENT';
+      // UPDATED: Added 'LOW_FOCUS' to local state type
+      let frameFocusState: 'DEEP_FLOW' | 'FOCUSED' | 'LOW_FOCUS' | 'DISTRACTED' | 'ABSENT' = 'ABSENT';
       
       // Variables for debug scoring display
       let currentYaw = 0;
@@ -1183,8 +1187,10 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
           isAbsent = false;
 
           // Determine State Label for UI (Display Only)
+          // UPDATED: STRICT 4-LEVEL LOGIC
           if (frameScore >= 85) frameFocusState = 'DEEP_FLOW';
           else if (frameScore >= 70) frameFocusState = 'FOCUSED';
+          else if (frameScore >= 50) frameFocusState = 'LOW_FOCUS'; // Missing 50-70 range restored
           else frameFocusState = 'DISTRACTED';
 
           // Check "Too Close"
@@ -1367,6 +1373,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       if (phase !== 'WORK') return 'stroke-blue-400 text-blue-400';
       if (isAiDisabled) return 'stroke-gray-500 text-gray-500';
       if (focusState === 'DISTRACTED') return 'stroke-red-500 text-red-500';
+      // UPDATED: Added Yellow color for LOW_FOCUS
+      if (focusState === 'LOW_FOCUS') return 'stroke-yellow-500 text-yellow-500';
       if (focusState === 'DEEP_FLOW') return 'stroke-indigo-400 text-indigo-400';
       return 'stroke-green-400 text-green-400';
   };
@@ -1597,7 +1605,11 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
                             <circle cx="28" cy="28" r="24" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray={2 * Math.PI * 24} strokeDashoffset={2 * Math.PI * 24 * (1 - focusScore / 100)} className={`${getStatusColor()} transition-all duration-500`} strokeLinecap="round" />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center text-white">
-                             {focusState === 'DEEP_FLOW' ? <Brain size={20} className="text-indigo-400" /> : focusState === 'DISTRACTED' ? <AlertTriangle size={20} className="text-red-500" /> : <UserIcon size={20} className="text-green-400" />}
+                             {/* UPDATED: ICON MAPPING FOR 4 STATES */}
+                             {focusState === 'DEEP_FLOW' ? <Brain size={20} className="text-indigo-400" /> : 
+                              focusState === 'DISTRACTED' ? <AlertTriangle size={20} className="text-red-500" /> : 
+                              focusState === 'LOW_FOCUS' ? <Battery size={20} className="text-yellow-500" /> :
+                              <UserIcon size={20} className="text-green-400" />}
                         </div>
                     </div>
                 </div>
