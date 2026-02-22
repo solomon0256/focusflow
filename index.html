@@ -4,6 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     <title>FocusFlow</title>
+    <script>
+      // 防御性编程：防止某些库尝试重写只读的 window.fetch
+      (function() {
+        const _fetch = window.fetch;
+        try {
+          Object.defineProperty(window, 'fetch', {
+            configurable: false,
+            enumerable: true,
+            get: function() { return _fetch; },
+            set: function() { console.warn('Blocked attempt to overwrite window.fetch'); }
+          });
+        } catch (e) {
+          console.log('Fetch protection already active or not supported');
+        }
+      })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       window.tailwind.config = {

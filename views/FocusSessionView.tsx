@@ -615,8 +615,8 @@ const FocusSessionView: React.FC<FocusSessionViewProps> = ({ mode, initialTimeIn
       const stdDev = Math.sqrt(variance);
       const stability = Math.max(0, Math.min(100, 100 - stdDev));
 
-      // Window Score Formula: 0.6 * avg + 0.3 * min + 0.1 * stability
-      const windowScore = (0.6 * avgScore) + (0.3 * minFrameScore) + (0.1 * stability);
+      // Window Score Formula: 0.4 * avg + 0.5 * min + 0.1 * stability
+      const windowScore = (0.4 * avgScore) + (0.5 * minFrameScore) + (0.1 * stability);
 
       minuteWindowScoresRef.current.push({
           score: windowScore,
